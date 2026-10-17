@@ -3,7 +3,6 @@ import PromoBanner from "../sections/PromoBanner";
 import Story from "../sections/Story";
 import SlideText from "../sections/SlideText";
 import MenuList from "../sections/MenuList";
-import Categories from "../sections/Categories";
 import Gallery from "../sections/Gallery";
 import HowItWorks from "../sections/HowItWorks";
 import Reveal from "../components/Reveal";
@@ -23,9 +22,6 @@ function Home() {
       <SlideText />
       <Reveal>
         <MenuList />
-      </Reveal>
-      <Reveal>
-        <Categories />
       </Reveal>
       <Reveal>
         <Gallery />
