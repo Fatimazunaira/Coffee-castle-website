@@ -1,5 +1,6 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useContext } from "react";
 import { Link } from "react-router-dom";
+import { CartContext } from "../context/CartContext";
 
 // Opening hours (keep these the same as the footer)
 function openHourFor(day) {
@@ -48,6 +49,7 @@ function getStatus() {
 }
 
 function Navbar() {
+  const { count } = useContext(CartContext);
   const [status, setStatus] = useState(getStatus());
 
   // check the time again every minute
@@ -67,7 +69,7 @@ function Navbar() {
 
       <nav>
         <Link to="/menu">MENU</Link>
-        <Link to="/cart">CART</Link>
+        <Link to="/cart">CART ({count})</Link>
         <Link to="/login">LOGIN</Link>
       </nav>
     </header>
