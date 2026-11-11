@@ -6,6 +6,8 @@ import Footer from "./components/Footer";
 import Loader from "./components/Loader";
 import Home from "./pages/Home";
 import Cart from "./pages/Cart";
+import Menu from "./pages/Menu";
+import Admin from "./pages/Admin";
 
 function App() {
   const [ready, setReady] = useState(false);
@@ -30,7 +32,9 @@ function App() {
           <Navbar />
           <Routes>
             <Route path="/" element={<Home />} />
+            <Route path="/menu" element={<Menu />} />
             <Route path="/cart" element={<Cart />} />
+            <Route path="/admin" element={<Admin />} />
           </Routes>
           <Footer />
         </>
