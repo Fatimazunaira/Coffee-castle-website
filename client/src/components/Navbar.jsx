@@ -67,7 +67,7 @@ function Navbar() {
   return (
     <header className="navbar">
       <Link to="/" onClick={closeMenu}>
-        COFFEE CASTLE/CAFÉ
+        COFFEE CASTLE
       </Link>
 
       <p className="status">
