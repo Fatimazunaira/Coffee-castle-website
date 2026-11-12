@@ -1,23 +1,54 @@
 import { useContext, useState } from "react";
-import { Link } from "react-router-dom";
+import { Link, useNavigate } from "react-router-dom";
 import { CartContext } from "../context/CartContext";
+import { AuthContext } from "../context/AuthContext";
+import { api } from "../api";
 
 function Cart() {
   const { items, total, changeQty, removeItem, clearCart } =
     useContext(CartContext);
+  const { user } = useContext(AuthContext);
+  const navigate = useNavigate();
 
   const [orderType, setOrderType] = useState("dine-in");
   const [payment, setPayment] = useState("counter");
-  const [name, setName] = useState("");
-  const [phone, setPhone] = useState("");
-  const [placed, setPlaced] = useState(false);
+  const [name, setName] = useState(user ? user.name : "");
+  const [phone, setPhone] = useState(user && user.phone ? user.phone : "");
+  // placed = the server's answer after a successful order (or null)
+  const [placed, setPlaced] = useState(null);
+  const [error, setError] = useState("");
+  const [sending, setSending] = useState(false);
 
-  function placeOrder(e) {
+  async function placeOrder(e) {
     e.preventDefault();
-    // Later this will send the order to the server and to Stripe.
-    // For now it only shows the thank you message.
-    setPlaced(true);
-    clearCart();
+
+    // You need an account to order, so the café knows who you are.
+    if (!user) {
+      navigate("/login", { state: { from: "/cart" } });
+      return;
+    }
+
+    setError("");
+    setSending(true);
+    try {
+      // The server works out the real prices and picks your table.
+      // Paying with Stripe will be added later.
+      const result = await api("/api/orders", {
+        method: "POST",
+        body: {
+          name,
+          phone,
+          orderType,
+          payment,
+          items: items.map((item) => ({ id: item.id, qty: item.qty })),
+        },
+      });
+      setPlaced(result);
+      clearCart();
+    } catch (err) {
+      setError(err.message);
+    }
+    setSending(false);
   }
 
   // After the order is placed
@@ -27,6 +58,11 @@ function Cart() {
         <div className="cart-done">
           <h2>Thank you, {name}!</h2>
           <p>Your order has been placed.</p>
+          {placed.table && <p>Your table is number {placed.table.number}.</p>}
+          {placed.waiting && (
+            <p>All tables are taken right now. We will give you one as soon as it is free.</p>
+          )}
+          {placed.orderType === "takeaway" && <p>We will have your order ready to take away.</p>}
           <Link to="/" className="order-btn">
             BACK TO HOME
           </Link>
@@ -63,7 +99,6 @@ function Cart() {
             <div key={item.id} className="cart-row">
               <div className="cart-name">
                 {item.name}
-                {item.details && <small>{item.details}</small>}
                 <small>Rs. {item.price} each</small>
               </div>
 
@@ -84,6 +119,12 @@ function Cart() {
 
         <form className="checkout" onSubmit={placeOrder}>
           <h2>Checkout</h2>
+
+          {!user && (
+            <p className="form-note">
+              Please <Link to="/login" state={{ from: "/cart" }}>log in or sign up</Link> to place your order.
+            </p>
+          )}
 
           <label className="field">
             Your name
@@ -150,8 +191,14 @@ function Cart() {
             <span>Rs. {total}</span>
           </div>
 
-          <button type="submit" className="place-btn">
-            PLACE ORDER
+          {error && (
+            <p className="form-error" role="alert">
+              {error}
+            </p>
+          )}
+
+          <button type="submit" className="place-btn" disabled={sending}>
+            {sending ? "PLEASE WAIT..." : user ? "PLACE ORDER" : "LOG IN TO ORDER"}
           </button>
         </form>
       </div>
