@@ -63,6 +63,7 @@ function Cart() {
             <div key={item.id} className="cart-row">
               <div className="cart-name">
                 {item.name}
+                {item.details && <small>{item.details}</small>}
                 <small>Rs. {item.price} each</small>
               </div>
 

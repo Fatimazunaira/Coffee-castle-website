@@ -3,20 +3,18 @@ import { createContext, useState } from "react";
 export const CartContext = createContext();
 
 export function CartProvider({ children }) {
-  // Two sample items so you can see the page.
-  // When the Menu page is ready, change this to useState([])
-  const [items, setItems] = useState([
-    { id: 1, name: "Caramel Latte", price: 450, qty: 1 },
-    { id: 2, name: "Chicken Club Sandwich", price: 650, qty: 2 },
-  ]);
+  // The cart starts empty. The Menu page fills it.
+  const [items, setItems] = useState([]);
 
-  // Add one item to the cart (used later by the Menu page)
-  function addToCart(newItem) {
+  // Add an item to the cart (used by the Menu popup).
+  // newItem = { id, name, price, details }   amount = how many (default 1)
+  // "details" is an optional line such as "Large · Oat milk" shown in the cart.
+  function addToCart(newItem, amount = 1) {
     const found = items.find((item) => item.id === newItem.id);
     if (found) {
-      changeQty(newItem.id, 1);
+      changeQty(newItem.id, amount);
     } else {
-      setItems([...items, { ...newItem, qty: 1 }]);
+      setItems([...items, { ...newItem, qty: amount }]);
     }
   }
 

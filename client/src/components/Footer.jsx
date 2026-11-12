@@ -4,7 +4,7 @@ function Footer() {
   return (
     <footer className="footer">
       <div className="footer-col">
-        <h3>COFFEE CASTLE/CAFÉ</h3>
+        <h3>COFFEE CASTLE</h3>
         <p>NUST Campus, Islamabad</p>
       </div>
 

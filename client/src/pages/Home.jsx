@@ -12,10 +12,12 @@ function Home() {
   return (
     <div>
       <Hero />
-      <Marquee />
-      <Reveal>
+
+          <Reveal>
         <PromoBanner />
       </Reveal>
+      <Marquee />
+  
       <Reveal>
         <Story />
       </Reveal>
@@ -23,9 +25,11 @@ function Home() {
       <Reveal>
         <MenuList />
       </Reveal>
+      
       <Reveal>
         <Gallery />
       </Reveal>
+      
       <Reveal>
         <HowItWorks />
       </Reveal>

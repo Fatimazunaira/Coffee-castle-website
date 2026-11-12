@@ -17,7 +17,6 @@ function Loader() {
 
   return (
     <div className={hide ? "loader hide" : "loader"}>
-      <p className="loader-script">Take a</p>
       <h1 className="loader-name">Coffee Castle</h1>
       <div className="loader-bar"></div>
     </div>
