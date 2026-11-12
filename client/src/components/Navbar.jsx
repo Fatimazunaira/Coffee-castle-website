@@ -51,6 +51,8 @@ function getStatus() {
 function Navbar() {
   const { count } = useContext(CartContext);
   const [status, setStatus] = useState(getStatus());
+  // menuOpen remembers if the phone menu is open or closed
+  const [menuOpen, setMenuOpen] = useState(false);
 
   // check the time again every minute
   useEffect(() => {
@@ -58,20 +60,50 @@ function Navbar() {
     return () => clearInterval(timer);
   }, []);
 
+  function closeMenu() {
+    setMenuOpen(false);
+  }
+
   return (
     <header className="navbar">
-      <Link to="/">COFFEE CASTLE/CAFÉ</Link>
+      <Link to="/" onClick={closeMenu}>
+        COFFEE CASTLE/CAFÉ
+      </Link>
 
       <p className="status">
         <span className={status.open ? "status-dot open" : "status-dot"}></span>
         {status.text}
       </p>
 
-      <nav>
-        <Link to="/menu">MENU</Link>
-        <Link to="/cart">CART ({count})</Link>
-        <Link to="/login">LOGIN</Link>
-      </nav>
+      <button
+        className={menuOpen ? "burger open" : "burger"}
+        onClick={() => setMenuOpen(!menuOpen)}
+        aria-label="Open menu"
+      >
+        <span></span>
+        <span></span>
+        <span></span>
+      </button>
+
+      <nav className={menuOpen ? "nav-links open" : "nav-links"}>
+  <Link to="/menu" onClick={closeMenu}>
+    MENU
+  </Link>
+
+   <Link to="/cart" onClick={closeMenu}>
+    CART ({count})
+  </Link>
+
+  <Link to="/orders" onClick={closeMenu}>
+    ORDER HISTORY
+  </Link>
+
+
+  <Link to="/login" onClick={closeMenu}>
+    LOGIN
+  </Link>
+</nav>
+
     </header>
   );
 }
