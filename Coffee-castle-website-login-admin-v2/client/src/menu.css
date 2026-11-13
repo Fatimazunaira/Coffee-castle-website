@@ -1,0 +1,489 @@
+/* ---------- Menu + Admin pages (uses the colours from index.css) ---------- */
+
+.mn-page {
+  padding: 130px 60px 100px 60px;
+  min-height: 70vh;
+}
+
+.mn-heading {
+  text-align: center;
+  margin-bottom: 50px;
+}
+
+.mn-script {
+  display: block;
+  font-family: 'Pinyon Script', cursive;
+  font-size: 60px;
+  color: var(--red);
+  transform: rotate(-3deg);
+  margin-bottom: -20px;
+}
+
+.mn-heading h1 {
+  font-family: 'DM Serif Display', serif;
+  font-weight: 400;
+  font-size: 80px;
+  color: var(--green);
+  margin: 0;
+}
+
+.mn-heading p {
+  margin: 16px 0 0 0;
+}
+
+.mn-empty {
+  text-align: center;
+  padding: 40px 0;
+  font-size: 18px;
+}
+
+/* ----- the yellow menu board ----- */
+.mn-board {
+  position: relative;
+  max-width: 900px;
+  margin: 0 auto;
+  background-color: #eeb55a;
+  padding: 40px 0;
+}
+
+.mn-board-title {
+  font-family: 'DM Serif Display', serif;
+  font-weight: 400;
+  font-size: 48px;
+  text-align: center;
+  margin: 0 0 10px 0;
+}
+
+.mn-cat {
+  font-family: 'DM Serif Display', serif;
+  font-weight: 400;
+  font-size: 30px;
+  margin: 30px 40px 6px 40px;
+  color: var(--red);
+}
+
+.mn-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  width: 100%;
+  box-sizing: border-box;
+  padding: 14px 40px;
+  border: 0;
+  background-color: transparent;
+  color: var(--dark);
+  font-family: inherit;
+  font-size: 20px;
+  text-align: left;
+  cursor: pointer;
+  transition: background-color 0.3s ease, color 0.3s ease;
+}
+
+.mn-row.active,
+.mn-row:focus-visible {
+  background-color: #7d5a3c;
+  color: var(--cream);
+  outline: none;
+}
+
+.mn-row.sold {
+  opacity: 0.55;
+  cursor: not-allowed;
+}
+
+.mn-dots {
+  flex: 1;
+  border-bottom: 2px dotted currentColor;
+}
+
+.mn-price {
+  font-weight: 700;
+}
+
+.mn-tag {
+  border: 1px solid currentColor;
+  padding: 2px 8px;
+  font-size: 12px;
+}
+
+/* the photo that follows the mouse (same look as the home page) */
+.mn-preview {
+  position: absolute;
+  width: 220px;
+  height: 180px;
+  background-color: #d9b48f;
+  background-size: cover;
+  background-position: center;
+  border: 6px solid #fdf6ea;
+  rotate: -4deg;
+  opacity: 0;
+  scale: 0.8;
+  transition: opacity 0.3s ease, scale 0.3s ease;
+  pointer-events: none;
+  z-index: 5;
+}
+
+.mn-preview.show {
+  opacity: 1;
+  scale: 1;
+}
+
+/* small photo inside the row, only for touch screens (no hover there) */
+.mn-thumb {
+  display: none;
+  width: 48px;
+  height: 48px;
+  object-fit: cover;
+  border: 2px solid var(--dark);
+}
+
+.mn-cartlink {
+  text-align: center;
+}
+
+.mn-toast {
+  position: fixed;
+  bottom: 30px;
+  left: 50%;
+  transform: translateX(-50%);
+  background-color: var(--dark);
+  color: var(--cream);
+  padding: 14px 26px;
+  z-index: 60;
+}
+
+/* ----- popup ----- */
+.mn-backdrop {
+  position: fixed;
+  inset: 0;
+  z-index: 50;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 20px;
+  background-color: rgba(20, 33, 61, 0.6);
+}
+
+.mn-modal {
+  position: relative;
+  display: flex;
+  width: 100%;
+  max-width: 860px;
+  max-height: 90vh;
+  overflow-y: auto;
+  background-color: var(--cream);
+  border: 2px solid var(--dark);
+}
+
+.mn-close {
+  position: absolute;
+  top: 10px;
+  right: 10px;
+  width: 36px;
+  height: 36px;
+  border: 2px solid var(--dark);
+  background-color: var(--cream);
+  color: var(--dark);
+  font-family: inherit;
+  font-size: 16px;
+  cursor: pointer;
+}
+
+.mn-close:hover {
+  background-color: var(--dark);
+  color: var(--cream);
+}
+
+.mn-modal-img {
+  flex: 0 0 42%;
+  width: 42%;
+  object-fit: cover;
+  min-height: 320px;
+}
+
+.mn-modal-body {
+  flex: 1;
+  padding: 36px 30px 30px 30px;
+}
+
+.mn-modal-cat {
+  margin: 0;
+  font-size: 13px;
+  letter-spacing: 2px;
+  text-transform: uppercase;
+  color: var(--red);
+}
+
+.mn-modal-body h2 {
+  font-family: 'DM Serif Display', serif;
+  font-weight: 400;
+  font-size: 42px;
+  margin: 6px 0;
+  color: var(--green);
+}
+
+.mn-modal-price {
+  font-weight: 700;
+  font-size: 22px;
+  margin: 0 0 10px 0;
+}
+
+.mn-modal-desc {
+  line-height: 1.6;
+  margin: 0 0 6px 0;
+}
+
+.mn-chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.mn-chip {
+  position: relative;
+  padding: 7px 12px;
+  border: 2px solid var(--dark);
+  font-size: 14px;
+  cursor: pointer;
+  transition: background-color 0.3s ease, color 0.3s ease;
+}
+
+.mn-chip input {
+  position: absolute;
+  opacity: 0;
+  pointer-events: none;
+}
+
+.mn-chip.on {
+  background-color: var(--dark);
+  color: var(--cream);
+}
+
+.mn-chip:focus-within {
+  outline: 2px solid var(--red);
+  outline-offset: 2px;
+}
+
+.mn-modal-foot {
+  display: flex;
+  align-items: center;
+  gap: 20px;
+  margin-top: 28px;
+}
+
+.mn-add {
+  flex: 1;
+}
+
+/* ----- admin page ----- */
+.ad-layout {
+  display: flex;
+  gap: 50px;
+  align-items: flex-start;
+}
+
+.ad-form {
+  flex: 1;
+  min-width: 0;
+}
+
+.ad-list {
+  flex: 1.3;
+  min-width: 0;
+}
+
+.ad-list h2 {
+  font-family: 'DM Serif Display', serif;
+  font-weight: 400;
+  font-size: 40px;
+  margin: 0 0 20px 0;
+}
+
+.ad-link {
+  text-decoration: underline;
+}
+
+.field select,
+.field textarea {
+  width: 100%;
+  box-sizing: border-box;
+  margin-top: 6px;
+  padding: 10px;
+  border: 2px solid var(--dark);
+  background-color: var(--cream);
+  font-family: inherit;
+  font-size: 16px;
+}
+
+.ad-preview {
+  display: block;
+  width: 100%;
+  max-height: 200px;
+  object-fit: cover;
+  margin: -6px 0 16px 0;
+  border: 2px solid var(--dark);
+}
+
+.ad-hint {
+  margin: -6px 0 16px 0;
+  font-size: 14px;
+  opacity: 0.7;
+}
+
+.ad-error {
+  margin: 16px 0 0 0;
+  padding: 10px;
+  background-color: var(--red);
+  color: var(--cream);
+  font-size: 14px;
+}
+
+.ad-notice {
+  margin: 16px 0 0 0;
+  padding: 10px;
+  background-color: var(--green);
+  color: var(--cream);
+  font-size: 14px;
+}
+
+.ad-form .place-btn {
+  margin-top: 20px;
+}
+
+.ad-form .place-btn:disabled {
+  opacity: 0.6;
+  cursor: wait;
+}
+
+.ad-cancel {
+  width: 100%;
+  margin-top: 10px;
+  padding: 12px;
+  border: 2px solid var(--dark);
+  background-color: transparent;
+  color: var(--dark);
+  font-family: inherit;
+  font-size: 16px;
+  cursor: pointer;
+}
+
+.ad-cancel:hover {
+  background-color: var(--dark);
+  color: var(--cream);
+}
+
+.ad-row {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  padding: 14px 0;
+  border-bottom: 1px dotted var(--dark);
+}
+
+.ad-row.editing {
+  background-color: #eeb55a;
+  padding-left: 10px;
+  padding-right: 10px;
+}
+
+.ad-row img {
+  width: 72px;
+  height: 72px;
+  object-fit: cover;
+  border: 2px solid var(--dark);
+}
+
+.ad-info {
+  flex: 1;
+  min-width: 0;
+}
+
+.ad-info strong {
+  display: block;
+  font-size: 18px;
+}
+
+.ad-info small {
+  display: block;
+  margin-top: 4px;
+  font-size: 13px;
+  opacity: 0.75;
+}
+
+/* ----- touch screens: no hover, so show the small photo in the row ----- */
+@media (hover: none) {
+  .mn-thumb {
+    display: block;
+  }
+
+  .mn-preview {
+    display: none;
+  }
+}
+
+/* ----- phones ----- */
+@media (max-width: 768px) {
+  .mn-page {
+    padding: 110px 20px 70px 20px;
+  }
+
+  .mn-heading h1 {
+    font-size: 56px;
+  }
+
+  .mn-script {
+    font-size: 44px;
+  }
+
+  .mn-board {
+    padding: 24px 0;
+  }
+
+  .mn-board-title {
+    font-size: 34px;
+  }
+
+  .mn-cat {
+    margin-left: 20px;
+    margin-right: 20px;
+  }
+
+  .mn-row {
+    padding: 12px 20px;
+    font-size: 16px;
+  }
+
+  .mn-modal {
+    flex-direction: column;
+  }
+
+  .mn-modal-img {
+    flex: none;
+    width: 100%;
+    height: 220px;
+    min-height: 0;
+  }
+
+  .mn-modal-body {
+    padding: 24px 20px 24px 20px;
+  }
+
+  .mn-modal-foot {
+    flex-wrap: wrap;
+  }
+
+  .ad-layout {
+    flex-direction: column;
+    gap: 40px;
+  }
+
+  .ad-form,
+  .ad-list {
+    width: 100%;
+    flex: none;
+  }
+
+  .ad-row {
+    flex-wrap: wrap;
+  }
+}

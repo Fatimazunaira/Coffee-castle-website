@@ -1,5 +1,5 @@
 import { useState, useEffect, useContext } from "react";
-import { Link, useNavigate } from "react-router-dom";
+import { Link } from "react-router-dom";
 import { CartContext } from "../context/CartContext";
 import { AuthContext } from "../context/AuthContext";
 
@@ -52,15 +52,9 @@ function getStatus() {
 function Navbar() {
   const { count, clearCart } = useContext(CartContext);
   const { user, logout } = useContext(AuthContext);
-  const navigate = useNavigate();
   const [status, setStatus] = useState(getStatus());
-
-  function handleLogout() {
-    // the cart stays saved on the server, it only leaves this screen
-    clearCart();
-    logout();
-    navigate("/");
-  }
+  // menuOpen remembers if the phone menu is open or closed
+  const [menuOpen, setMenuOpen] = useState(false);
 
   // check the time again every minute
   useEffect(() => {
@@ -68,27 +62,68 @@ function Navbar() {
     return () => clearInterval(timer);
   }, []);
 
+  function closeMenu() {
+    setMenuOpen(false);
+  }
+
+  function handleLogout() {
+    logout();
+    clearCart(); // the next person on this browser should not see this cart
+    closeMenu();
+  }
+
   return (
     <header className="navbar">
-      <Link to="/">COFFEE CASTLE/CAFÉ</Link>
+      <Link to="/" onClick={closeMenu}>
+        COFFEE CASTLE
+      </Link>
 
       <p className="status">
         <span className={status.open ? "status-dot open" : "status-dot"}></span>
         {status.text}
       </p>
 
-      <nav>
-        <Link to="/menu">MENU</Link>
-        <Link to="/cart">CART ({count})</Link>
-        {user && user.role === "admin" && <Link to="/admin">ADMIN</Link>}
-        {user ? (
-          <button type="button" className="nav-button" onClick={handleLogout}>
-            LOGOUT
-          </button>
-        ) : (
-          <Link to="/login">LOGIN</Link>
-        )}
-      </nav>
+      <button
+        className={menuOpen ? "burger open" : "burger"}
+        onClick={() => setMenuOpen(!menuOpen)}
+        aria-label="Open menu"
+      >
+        <span></span>
+        <span></span>
+        <span></span>
+      </button>
+
+      <nav className={menuOpen ? "nav-links open" : "nav-links"}>
+  <Link to="/menu" onClick={closeMenu}>
+    MENU
+  </Link>
+
+   <Link to="/cart" onClick={closeMenu}>
+    CART ({count})
+  </Link>
+
+  <Link to="/orders" onClick={closeMenu}>
+    ORDER HISTORY
+  </Link>
+
+
+  {user && user.role === "admin" && (
+    <Link to="/admin" onClick={closeMenu}>
+      ADMIN
+    </Link>
+  )}
+
+  {user ? (
+    <button type="button" className="nav-button" onClick={handleLogout}>
+      LOGOUT
+    </button>
+  ) : (
+    <Link to="/login" onClick={closeMenu}>
+      LOGIN
+    </Link>
+  )}
+</nav>
+
     </header>
   );
 }

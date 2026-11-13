@@ -1,5 +1,5 @@
 import { useContext, useState } from "react";
-import { Link, useNavigate } from "react-router-dom";
+import { Link } from "react-router-dom";
 import { CartContext } from "../context/CartContext";
 import { AuthContext } from "../context/AuthContext";
 import { api } from "../api";
@@ -7,32 +7,26 @@ import { api } from "../api";
 function Cart() {
   const { items, total, changeQty, removeItem, clearCart } =
     useContext(CartContext);
-  const { user } = useContext(AuthContext);
-  const navigate = useNavigate();
+  const { user, loading } = useContext(AuthContext);
 
   const [orderType, setOrderType] = useState("dine-in");
   const [payment, setPayment] = useState("counter");
-  const [name, setName] = useState(user ? user.name : "");
-  const [phone, setPhone] = useState(user && user.phone ? user.phone : "");
-  // placed = the server's answer after a successful order (or null)
-  const [placed, setPlaced] = useState(null);
+  // null = the customer has not typed anything: use the name and phone of their account
+  const [typedName, setName] = useState(null);
+  const [typedPhone, setPhone] = useState(null);
+  const name = typedName ?? (user ? user.name : "");
+  const phone = typedPhone ?? (user ? user.phone || "" : "");
+  const [placed, setPlaced] = useState(null); // the server's answer, once the order is saved
   const [error, setError] = useState("");
-  const [sending, setSending] = useState(false);
+  const [busy, setBusy] = useState(false);
 
   async function placeOrder(e) {
     e.preventDefault();
-
-    // You need an account to order, so the café knows who you are.
-    if (!user) {
-      navigate("/login", { state: { from: "/cart" } });
-      return;
-    }
-
     setError("");
-    setSending(true);
+    setBusy(true);
     try {
-      // The server works out the real prices and picks your table.
-      // Paying with Stripe will be added later.
+      // We send only WHICH dishes and choices. The server works out the prices.
+      // (Paying by card is not connected yet: for now the order is only saved.)
       const result = await api("/api/orders", {
         method: "POST",
         body: {
@@ -40,7 +34,11 @@ function Cart() {
           phone,
           orderType,
           payment,
-          items: items.map((item) => ({ id: item.id, qty: item.qty })),
+          items: items.map((item) => ({
+            itemId: item.itemId,
+            options: item.options || null,
+            qty: item.qty,
+          })),
         },
       });
       setPlaced(result);
@@ -48,7 +46,7 @@ function Cart() {
     } catch (err) {
       setError(err.message);
     }
-    setSending(false);
+    setBusy(false);
   }
 
   // After the order is placed
@@ -57,14 +55,29 @@ function Cart() {
       <section className="cart-page">
         <div className="cart-done">
           <h2>Thank you, {name}!</h2>
-          <p>Your order has been placed.</p>
+          <p>Your order #{placed.orderId} has been placed. Total: Rs. {placed.total}.</p>
           {placed.table && <p>Your table is number {placed.table.number}.</p>}
           {placed.waiting && (
             <p>All tables are taken right now. We will give you one as soon as it is free.</p>
           )}
-          {placed.orderType === "takeaway" && <p>We will have your order ready to take away.</p>}
           <Link to="/" className="order-btn">
             BACK TO HOME
+          </Link>
+        </div>
+      </section>
+    );
+  }
+
+  // Wait while we check the saved login, then ask guests to log in
+  if (loading) return null;
+  if (!user) {
+    return (
+      <section className="cart-page">
+        <div className="cart-done">
+          <h2>Please log in to order</h2>
+          <p>Log in or sign up so we can save your cart and give you a table.</p>
+          <Link to="/login" state={{ from: "/cart" }} className="order-btn">
+            LOG IN
           </Link>
         </div>
       </section>
@@ -99,6 +112,7 @@ function Cart() {
             <div key={item.id} className="cart-row">
               <div className="cart-name">
                 {item.name}
+                {item.details && <small>{item.details}</small>}
                 <small>Rs. {item.price} each</small>
               </div>
 
@@ -119,12 +133,6 @@ function Cart() {
 
         <form className="checkout" onSubmit={placeOrder}>
           <h2>Checkout</h2>
-
-          {!user && (
-            <p className="form-note">
-              Please <Link to="/login" state={{ from: "/cart" }}>log in or sign up</Link> to place your order.
-            </p>
-          )}
 
           <label className="field">
             Your name
@@ -197,8 +205,8 @@ function Cart() {
             </p>
           )}
 
-          <button type="submit" className="place-btn" disabled={sending}>
-            {sending ? "PLEASE WAIT..." : user ? "PLACE ORDER" : "LOG IN TO ORDER"}
+          <button type="submit" className="place-btn" disabled={busy}>
+            {busy ? "PLACING…" : "PLACE ORDER"}
           </button>
         </form>
       </div>

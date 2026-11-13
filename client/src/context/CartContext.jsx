@@ -7,19 +7,16 @@ export const CartContext = createContext();
 export function CartProvider({ children }) {
   const { user } = useContext(AuthContext);
 
-  // Two sample items so you can see the page.
-  // When the Menu page is ready, change this to useState([])
-  const [items, setItems] = useState([
-    { id: 1, name: "Caramel Latte", price: 450, qty: 1 },
-    { id: 2, name: "Chicken Club Sandwich", price: 650, qty: 2 },
-  ]);
+  // The cart starts empty. The Menu page fills it.
+  const [items, setItems] = useState([]);
 
   // syncedFor = the id of the logged-in user whose saved cart we have loaded.
   // Until then we do not save anything, so we never wipe a saved cart by mistake.
   const [syncedFor, setSyncedFor] = useState(null);
   const userId = user ? user.id : null;
 
-  // When someone logs in, load the cart they saved last time (if any).
+  // When someone logs in, load the cart they saved last time and join it with
+  // anything they already put in the cart before logging in.
   useEffect(() => {
     if (!userId) return;
     let cancelled = false;
@@ -27,9 +24,18 @@ export function CartProvider({ children }) {
     api("/api/cart")
       .then((data) => {
         if (cancelled) return;
-        if (data.items.length > 0) {
-          setItems(data.items);
-        }
+        setItems((current) => {
+          const merged = current.map((item) => ({ ...item }));
+          for (const saved of data.items) {
+            const same = merged.find((item) => item.id === saved.id);
+            if (same) {
+              same.qty = Math.min(same.qty + saved.qty, 50);
+            } else {
+              merged.push(saved);
+            }
+          }
+          return merged;
+        });
         setSyncedFor(userId);
       })
       .catch(() => {
@@ -50,20 +56,28 @@ export function CartProvider({ children }) {
     const timer = setTimeout(() => {
       api("/api/cart", {
         method: "PUT",
-        body: { items: items.map((item) => ({ id: item.id, qty: item.qty })) },
+        body: {
+          items: items
+            .filter((item) => item.itemId !== undefined)
+            .map((item) => ({ itemId: item.itemId, options: item.options || null, qty: item.qty })),
+        },
       }).catch(() => {});
     }, 500);
 
     return () => clearTimeout(timer);
   }, [items, userId, syncedFor]);
 
-  // Add one item to the cart (used later by the Menu page)
-  function addToCart(newItem) {
+  // Add an item to the cart (used by the Menu popup).
+  // newItem = { id, name, price, details, itemId, options }   amount = how many (default 1)
+  // "details" is an optional line such as "Large · Oat milk" shown in the cart.
+  // "itemId" and "options" tell the server which dish and which choices this is:
+  // the server works out the real price itself.
+  function addToCart(newItem, amount = 1) {
     const found = items.find((item) => item.id === newItem.id);
     if (found) {
-      changeQty(newItem.id, 1);
+      changeQty(newItem.id, amount);
     } else {
-      setItems([...items, { ...newItem, qty: 1 }]);
+      setItems([...items, { ...newItem, qty: amount }]);
     }
   }
 

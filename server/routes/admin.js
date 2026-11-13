@@ -1,6 +1,9 @@
 const express = require("express");
 const db = require("../db");
 const { requireAdmin } = require("../middleware/auth");
+const { CATEGORIES } = require("../menuOptions");
+const { loadCart, showLine } = require("../cartLines");
+const { showItem } = require("./public");
 
 const router = express.Router();
 
@@ -82,15 +85,8 @@ router.get("/customers/:id", (req, res) => {
     return res.status(404).json({ error: "Customer not found." });
   }
 
-  const cart = db
-    .prepare(
-      `SELECT m.id, m.name, m.price, m.available, c.qty
-       FROM carts c JOIN menu_items m ON m.id = c.menu_item_id
-       WHERE c.user_id = ? ORDER BY m.name`
-    )
-    .all(id)
-    .map((item) => ({ ...item, available: item.available === 1 }));
-  const cartTotal = cart.reduce((sum, item) => sum + item.price * item.qty, 0);
+  const cart = loadCart(id).map(showLine);
+  const cartTotal = cart.reduce((sum, line) => sum + line.price * line.qty, 0);
 
   const orders = db
     .prepare(
@@ -102,7 +98,7 @@ router.get("/customers/:id", (req, res) => {
     )
     .all(id);
 
-  const itemsFor = db.prepare("SELECT name, price, qty FROM order_items WHERE order_id = ?");
+  const itemsFor = db.prepare("SELECT name, details, price, qty FROM order_items WHERE order_id = ?");
   for (const order of orders) {
     order.at_table_now = order.at_table_now === 1;
     order.items = itemsFor.all(order.id);
@@ -176,32 +172,52 @@ router.post("/tables/:id/free", (req, res) => {
 // Menu
 // ---------------------------------------------------------------
 
+// A picture is a link inside the site (/images/...), an https link, or a
+// small JPEG / PNG / WebP saved as text (what the admin form makes when you
+// choose a photo). Anything else, such as "javascript:...", is refused.
+const IMAGE_PATH = /^\/[\w\-./]{1,200}$/;
+const IMAGE_URL = /^https:\/\/[^\s"'<>]{1,300}$/;
+const IMAGE_DATA = /^data:image\/(jpeg|png|webp);base64,[A-Za-z0-9+/=]+$/;
+const MAX_DATA_IMAGE = 700 * 1024; // characters
+
 // Checks the form data for a menu item. Returns { error } or { value }.
 function readMenuBody(body) {
-  const name = text(body.name, 80);
-  const description = text(body.description, 300);
-  const category = text(body.category, 30) || "Coffee";
-  const image = text(body.image, 200);
+  const name = typeof body.name === "string" ? body.name.trim() : "";
+  const description = text(body.description, 200);
+  const image = typeof body.image === "string" ? body.image.trim() : "";
   const price = Number(body.price);
 
-  if (!name) return { error: "Please enter a name." };
-  if (!Number.isInteger(price) || price < 0 || price > 100000) {
-    return { error: "Price must be a whole number, like 450." };
+  if (!name) return { error: "Please enter the name of the food." };
+  if (name.length > 60) return { error: "The name is too long (60 characters max)." };
+  if (!Number.isInteger(price) || price <= 0 || price > 100000) {
+    return { error: "Price must be a whole number greater than 0, like 450." };
   }
-  // Pictures must live in the site (/images/...) or be an https link.
-  if (image && !/^(\/[\w\-./]+|https:\/\/[^\s]+)$/.test(image)) {
-    return { error: "Image must look like /images/menu1.jpg or start with https://" };
+  if (!image) return { error: "A picture of the food is required." };
+
+  const okImage =
+    IMAGE_PATH.test(image) ||
+    IMAGE_URL.test(image) ||
+    (IMAGE_DATA.test(image) && image.length <= MAX_DATA_IMAGE);
+  if (!okImage) {
+    return { error: "That picture cannot be used. Choose a JPG, PNG or WebP photo (not too large)." };
   }
 
   return {
-    value: { name, description, category, price, image, available: body.available === false ? 0 : 1 },
+    value: {
+      name,
+      description,
+      image,
+      price,
+      category: CATEGORIES.includes(body.category) ? body.category : CATEGORIES[0],
+      isDrink: body.isDrink === true ? 1 : 0,
+      soldOut: body.soldOut === true ? 1 : 0,
+    },
   };
 }
 
 const getItem = db.prepare(
-  "SELECT id, name, description, category, price, image, available FROM menu_items WHERE id = ?"
+  "SELECT id, name, description, category, price, image, is_drink, sold_out FROM menu_items WHERE id = ?"
 );
-const showItem = (row) => ({ ...row, available: row.available === 1 });
 
 // POST /api/admin/menu
 router.post("/menu", (req, res) => {
@@ -210,26 +226,27 @@ router.post("/menu", (req, res) => {
 
   const result = db
     .prepare(
-      "INSERT INTO menu_items (name, description, category, price, image, available) VALUES (?, ?, ?, ?, ?, ?)"
+      "INSERT INTO menu_items (name, description, category, price, image, is_drink, sold_out) VALUES (?, ?, ?, ?, ?, ?, ?)"
     )
-    .run(value.name, value.description, value.category, value.price, value.image, value.available);
+    .run(value.name, value.description, value.category, value.price, value.image, value.isDrink, value.soldOut);
 
   res.status(201).json({ item: showItem(getItem.get(result.lastInsertRowid)) });
 });
 
-// PUT /api/admin/menu/:id   (edit an item, or mark it sold out with available: false)
+// PUT /api/admin/menu/:id   (edit an item, or mark it sold out with soldOut: true)
 router.put("/menu/:id", (req, res) => {
   const id = asId(req.params.id);
   if (!id || !getItem.get(id)) {
-    return res.status(404).json({ error: "Menu item not found." });
+    return res.status(404).json({ error: "That item no longer exists." });
   }
 
   const { error, value } = readMenuBody(req.body);
   if (error) return res.status(400).json({ error });
 
   db.prepare(
-    "UPDATE menu_items SET name = ?, description = ?, category = ?, price = ?, image = ?, available = ? WHERE id = ?"
-  ).run(value.name, value.description, value.category, value.price, value.image, value.available, id);
+    `UPDATE menu_items SET name = ?, description = ?, category = ?, price = ?, image = ?,
+       is_drink = ?, sold_out = ? WHERE id = ?`
+  ).run(value.name, value.description, value.category, value.price, value.image, value.isDrink, value.soldOut, id);
 
   res.json({ item: showItem(getItem.get(id)) });
 });
@@ -238,7 +255,7 @@ router.put("/menu/:id", (req, res) => {
 router.delete("/menu/:id", (req, res) => {
   const id = asId(req.params.id);
   if (!id || !getItem.get(id)) {
-    return res.status(404).json({ error: "Menu item not found." });
+    return res.status(404).json({ error: "That item no longer exists." });
   }
   db.transaction(() => {
     db.prepare("DELETE FROM carts WHERE menu_item_id = ?").run(id);

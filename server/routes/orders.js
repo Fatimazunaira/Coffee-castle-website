@@ -1,10 +1,9 @@
 const express = require("express");
 const db = require("../db");
 const { requireLogin } = require("../middleware/auth");
+const { checkLines } = require("../cartLines");
 
 const router = express.Router();
-
-class OrderError extends Error {}
 
 // Everything inside db.transaction() happens as ONE step: either all of it
 // is saved or none of it is. The server also runs this code one request at a
@@ -23,10 +22,10 @@ const placeOrder = db.transaction((user, form, lines) => {
   const orderId = Number(order.lastInsertRowid);
 
   const insertLine = db.prepare(
-    "INSERT INTO order_items (order_id, menu_item_id, name, price, qty) VALUES (?, ?, ?, ?, ?)"
+    "INSERT INTO order_items (order_id, menu_item_id, name, details, price, qty) VALUES (?, ?, ?, ?, ?, ?)"
   );
   for (const line of lines) {
-    insertLine.run(orderId, line.id, line.name, line.price, line.qty);
+    insertLine.run(orderId, line.itemId, line.name, line.details, line.price, line.qty);
   }
 
   // Dine-in orders get the lowest-numbered free table.
@@ -53,7 +52,7 @@ const placeOrder = db.transaction((user, form, lines) => {
 });
 
 // POST /api/orders
-// body: { name, phone, orderType, payment, items: [{ id, qty }] }
+// body: { name, phone, orderType, payment, items: [{ itemId, options, qty }] }
 router.post("/", requireLogin, (req, res) => {
   const body = req.body || {};
   const name = typeof body.name === "string" ? body.name.trim().slice(0, 80) : "";
@@ -72,38 +71,18 @@ router.post("/", requireLogin, (req, res) => {
     return res.status(400).json({ error: "Your cart is empty." });
   }
 
-  try {
-    // Look every item up in the menu: the price comes from the database.
-    const find = db.prepare("SELECT id, name, price, available FROM menu_items WHERE id = ?");
-    const byId = new Map();
-
-    for (const item of body.items) {
-      const id = Number(item.id);
-      const qty = Number(item.qty);
-      if (!Number.isInteger(id) || !Number.isInteger(qty) || qty < 1 || qty > 50) {
-        throw new OrderError("Something is wrong with an item in your cart.");
-      }
-      const menuItem = find.get(id);
-      if (!menuItem) {
-        throw new OrderError("An item in your cart is no longer on the menu.");
-      }
-      if (!menuItem.available) {
-        throw new OrderError(`${menuItem.name} is sold out. Please remove it from your cart.`);
-      }
-      const existing = byId.get(id);
-      byId.set(id, { ...menuItem, qty: Math.min((existing ? existing.qty : 0) + qty, 50) });
-    }
-
-    const result = placeOrder(req.user, { name, phone, orderType: body.orderType, payment: body.payment }, [
-      ...byId.values(),
-    ]);
-    res.status(201).json(result);
-  } catch (err) {
-    if (err instanceof OrderError) {
-      return res.status(400).json({ error: err.message });
-    }
-    throw err;
+  // Look every item up in the menu: the price comes from the database.
+  const { lines, problem } = checkLines(body.items, { strict: true });
+  if (problem) {
+    return res.status(400).json({ error: problem });
   }
+  const soldOut = lines.find((line) => line.soldOut);
+  if (soldOut) {
+    return res.status(400).json({ error: `${soldOut.name} is sold out. Please remove it from your cart.` });
+  }
+
+  const result = placeOrder(req.user, { name, phone, orderType: body.orderType, payment: body.payment }, lines);
+  res.status(201).json(result);
 });
 
 module.exports = router;

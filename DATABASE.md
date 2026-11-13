@@ -36,7 +36,7 @@ Why SQLite for this project:
 On the first start the server creates `server/coffee-castle.db` and fills it with:
 
 - the tables below (all empty),
-- 6 menu items (the prices of the last four are placeholders, change them in the admin panel),
+- the 6 starter menu items (the same dishes and prices as the original menu; change them in the admin panel),
 - the promo banner,
 - 10 cafe tables,
 - one admin account, from `ADMIN_EMAIL` and `ADMIN_PASSWORD` in `.env`.
@@ -70,12 +70,12 @@ FROM orders o ORDER BY o.id DESC;
 | Table | What it holds |
 | --- | --- |
 | `users` | Customers and admins. `role` is `customer` or `admin`. Passwords are stored hashed (bcrypt), never as text. |
-| `menu_items` | The menu. `available = 0` means sold out. |
+| `menu_items` | The menu: name, description, category, price, picture, `is_drink` and `sold_out` (1 = sold out). The Menu page and the admin menu form read and write this table. |
 | `promo` | The home page banner. Always exactly one row (`id = 1`). |
 | `cafe_tables` | The 10 tables in the cafe. `order_id` is the order sitting there now; `NULL` means free. |
 | `orders` | One row per order: who, dine-in or takeaway, total, status and `table_id`. |
-| `order_items` | The lines of each order. Name and price are copied from the menu at the time of ordering. |
-| `carts` | What each logged-in customer currently has in their cart (this is what the admin sees). |
+| `order_items` | The lines of each order. Name, drink choices (`details`, like "Large · Oat milk") and price are copied at the time of ordering, so old orders do not change when the menu does. |
+| `carts` | What each logged-in customer currently has in their cart (this is what the admin sees). Only the dish, the choices and the quantity are saved: the price is worked out again by the server every time. |
 
 ```mermaid
 erDiagram
@@ -85,6 +85,18 @@ erDiagram
     orders }o--o| cafe_tables : "seated at"
     menu_items ||--o{ carts : "in"
 ```
+
+## Prices are decided by the server
+
+The browser sends only *which dish*, *which choices* (size, milk, shots, sugar, add-ons) and *how many*.
+`server/menuOptions.js` works the price out from the `menu_items` table. This means nobody can change
+a price by editing the page in their browser. `server/menuOptions.js` must stay the same as
+`client/src/data/menuOptions.js`: if you change an option price in one, change it in the other.
+
+## Menu items you added before the database existed
+
+Before this version, admin-added menu items were kept in the browser's localStorage. They are **not**
+copied into the database. Add them again in Admin > Menu.
 
 ## How a table is given to a customer
 
@@ -105,7 +117,8 @@ coffee-castle.db-shm
 coffee-castle.db-wal
 ```
 
-You get a fresh database with the starter data again.
+You get a fresh database with the starter data again. If an older test version of this project
+made the file, the server will tell you to do exactly this when it starts.
 
 ## Changing the tables later
 

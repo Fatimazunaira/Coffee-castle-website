@@ -82,7 +82,8 @@ function CustomerDetail({ customerId, onBack }) {
                 <tr key={item.id}>
                   <td>
                     {item.name}
-                    {!item.available && <span className="badge"> sold out</span>}
+                    {item.details && <small className="cell-note">{item.details}</small>}
+                    {item.soldOut && <span className="badge"> sold out</span>}
                   </td>
                   <td>{item.qty}</td>
                   <td>{money(item.price)}</td>
@@ -131,7 +132,7 @@ function CustomerDetail({ customerId, onBack }) {
                           : "Waiting"}
                   </td>
                   <td>{order.status}</td>
-                  <td>{order.items.map((item) => item.qty + " x " + item.name).join(", ")}</td>
+                  <td>{order.items.map((item) => item.qty + " x " + item.name + (item.details ? " (" + item.details + ")" : "")).join(", ")}</td>
                   <td>{money(order.total)}</td>
                 </tr>
               ))}

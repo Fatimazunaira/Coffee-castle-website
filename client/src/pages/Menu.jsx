@@ -8,7 +8,7 @@ import "../menu.css";
 // Customer menu page (/menu).
 // Hover a row: the food photo follows the cursor. Click a row: popup, then cart.
 function Menu() {
-  const { items, loading } = useMenu();
+  const { items, loading, error } = useMenu();
 
   const [selected, setSelected] = useState(null); // item shown in the popup
   const [active, setActive] = useState(null); // item whose photo is previewed
@@ -51,6 +51,12 @@ function Menu() {
 
       {loading ? (
         <p className="mn-empty">Loading the menu…</p>
+      ) : error ? (
+        <p className="mn-empty" role="alert">
+          {error}
+          <br />
+          (Is the server running? In the server folder run: node index.js)
+        </p>
       ) : items.length === 0 ? (
         <p className="mn-empty">No items on the menu yet. Please check back soon.</p>
       ) : (

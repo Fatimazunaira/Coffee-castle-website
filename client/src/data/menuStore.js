@@ -1,65 +1,29 @@
 // ---------------------------------------------------------------------------
 // MENU STORE: the ONLY file that knows where menu items are saved.
 //
-// Right now items live in the browser's localStorage (no database yet).
-// Every function is async and returns a Promise, so when the database is
-// ready you only rewrite the bodies of these functions to call the server,
-// for example:   getMenu()  ->  fetch("/api/menu").then(r => r.json())
-// Nothing in the Menu page, Admin page or popup has to change.
+// Items are saved in the database, through the server. (Before the database
+// existed they lived in the browser's localStorage; the functions below have
+// the same names and the same results, so the Menu page, Admin page and popup
+// did not need to change.)
+//
+// Reading the menu is open to everybody. Adding, editing and deleting only
+// work when an admin is logged in: the server checks that on every request.
 //
 // An item looks like:
 // { id, name, price, image, category, description, isDrink, soldOut }
 //   image = a data URL (admin upload) or a path like "/images/menu1.jpg"
 // ---------------------------------------------------------------------------
+import { api } from "../api";
 import { CATEGORIES } from "./menuOptions";
 
-const KEY = "coffee-castle-menu";
 const CHANGED = "coffee-castle-menu-changed";
-
-// Items shown the first time, before the admin changes anything.
-// Prices are placeholders: edit them from /admin.
-const SEED_ITEMS = [
-  { id: "seed-1", name: "Caramel Latte", price: 450, image: "/images/menu1.jpg", category: "Hot Coffee", description: "Espresso, steamed milk and a ribbon of caramel.", isDrink: true, soldOut: false },
-  { id: "seed-2", name: "Chicken Club Sandwich", price: 650, image: "/images/menu2.jpg", category: "Snacks", description: "Grilled chicken, egg and lettuce on toasted bread.", isDrink: false, soldOut: false },
-  { id: "seed-3", name: "Cheese Omelette", price: 400, image: "/images/menu3.jpg", category: "Snacks", description: "Fluffy eggs folded around melted cheese.", isDrink: false, soldOut: false },
-  { id: "seed-4", name: "Chocolate Brownie", price: 320, image: "/images/menu4.jpg", category: "Bakery", description: "Fudgy brownie with a crisp top.", isDrink: false, soldOut: false },
-  { id: "seed-5", name: "Cold Coffee", price: 480, image: "/images/menu5.jpg", category: "Cold Drinks", description: "Chilled coffee blended smooth with ice and milk.", isDrink: true, soldOut: false },
-  { id: "seed-6", name: "Loaded Fries", price: 450, image: "/images/menu6.jpg", category: "Snacks", description: "Crispy fries with cheese sauce and jalapeños.", isDrink: false, soldOut: false },
-];
-
-function read() {
-  try {
-    const raw = localStorage.getItem(KEY);
-    if (raw) {
-      const list = JSON.parse(raw);
-      if (Array.isArray(list)) return list;
-    }
-  } catch {
-    /* storage blocked or data corrupted: fall through to the sample menu */
-  }
-  return null;
-}
-
-function save(items) {
-  try {
-    localStorage.setItem(KEY, JSON.stringify(items));
-  } catch {
-    throw new Error(
-      "Could not save: browser storage is full. Try a smaller photo or delete an item."
-    );
-  }
-}
 
 function announceChange() {
   window.dispatchEvent(new Event(CHANGED));
 }
 
-function newId() {
-  return Date.now().toString(36) + Math.random().toString(36).slice(2, 7);
-}
-
 // Checks one item and returns a clean copy. Throws an Error with a message
-// the admin form can show. (The server should repeat these checks later.)
+// the admin form can show. (The server repeats these checks.)
 function clean(data) {
   const name = String(data.name ?? "").trim();
   const price = Number(data.price);
@@ -84,51 +48,39 @@ function clean(data) {
 // ----- the functions the rest of the app uses -----
 
 export async function getMenu() {
-  let items = read();
-  if (!items) {
-    items = SEED_ITEMS;
-    try {
-      save(items);
-    } catch {
-      /* not fatal: the sample menu is still shown */
-    }
-  }
-  return items;
+  const data = await api("/api/menu");
+  return data.items;
 }
 
 export async function addItem(data) {
-  const items = (await getMenu()).slice();
-  const item = { id: newId(), ...clean(data) };
-  items.push(item);
-  save(items);
+  const result = await api("/api/admin/menu", { method: "POST", body: clean(data) });
   announceChange();
-  return item;
+  return result.item;
 }
 
 export async function updateItem(id, data) {
+  // merge with the existing item, like the old version did, so a partial
+  // change (for example only soldOut) keeps the other fields
   const items = await getMenu();
-  if (!items.some((i) => i.id === id)) throw new Error("That item no longer exists.");
-  const updated = items.map((i) => (i.id === id ? { id, ...clean({ ...i, ...data }) } : i));
-  save(updated);
+  const current = items.find((i) => i.id === id);
+  if (!current) throw new Error("That item no longer exists.");
+  await api("/api/admin/menu/" + id, { method: "PUT", body: clean({ ...current, ...data }) });
   announceChange();
 }
 
 export async function deleteItem(id) {
-  const items = await getMenu();
-  save(items.filter((i) => i.id !== id));
+  await api("/api/admin/menu/" + id, { method: "DELETE" });
   announceChange();
 }
 
-// Calls `callback` whenever the menu changes: in this tab (admin saved)
-// or in another tab. Returns a function that stops listening.
+// Calls `callback` whenever the menu changes: in this tab (admin saved), or
+// when you come back to this tab after being away. Returns a function that
+// stops listening.
 export function subscribe(callback) {
-  const onStorage = (e) => {
-    if (e.key === KEY || e.key === null) callback();
-  };
   window.addEventListener(CHANGED, callback);
-  window.addEventListener("storage", onStorage);
+  window.addEventListener("focus", callback);
   return () => {
     window.removeEventListener(CHANGED, callback);
-    window.removeEventListener("storage", onStorage);
+    window.removeEventListener("focus", callback);
   };
 }

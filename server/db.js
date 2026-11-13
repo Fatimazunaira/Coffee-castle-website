@@ -24,6 +24,18 @@ db.transaction = (fn) => (...args) => {
   }
 };
 
+// PRAGMA user_version is a number stored inside the database file.
+// 0 = brand new file, 2 = this layout. (1 was an earlier test layout.)
+const version = db.prepare("PRAGMA user_version").get().user_version;
+if (version === 1) {
+  console.error(
+    "Your server/coffee-castle.db was made by an older test version of this project.\n" +
+      "Stop the server, delete server/coffee-castle.db (and the .db-shm / .db-wal files next to it),\n" +
+      "then start the server again. See DATABASE.md."
+  );
+  process.exit(1);
+}
+
 // ---------- Tables ----------
 // "CREATE TABLE IF NOT EXISTS" is safe to run every time the server starts.
 db.exec(`
@@ -37,14 +49,16 @@ db.exec(`
     created_at    TEXT    NOT NULL DEFAULT (datetime('now'))
   );
 
+  -- image is a link like /images/menu1.jpg, or a small picture saved as text (a data URL).
   CREATE TABLE IF NOT EXISTS menu_items (
     id          INTEGER PRIMARY KEY AUTOINCREMENT,
     name        TEXT    NOT NULL,
     description TEXT    NOT NULL DEFAULT '',
-    category    TEXT    NOT NULL DEFAULT 'Coffee',
-    price       INTEGER NOT NULL CHECK (price >= 0),
-    image       TEXT    NOT NULL DEFAULT '',
-    available   INTEGER NOT NULL DEFAULT 1
+    category    TEXT    NOT NULL,
+    price       INTEGER NOT NULL CHECK (price > 0),
+    image       TEXT    NOT NULL,
+    is_drink    INTEGER NOT NULL DEFAULT 0,
+    sold_out    INTEGER NOT NULL DEFAULT 0
   );
 
   -- The promo banner on the home page. Only ever ONE row (id = 1).
@@ -79,46 +93,54 @@ db.exec(`
     created_at    TEXT    NOT NULL DEFAULT (datetime('now'))
   );
 
-  -- name and price are copied from the menu at the moment of ordering,
+  -- name, price and details are copied from the menu at the moment of ordering,
   -- so old receipts stay correct even if the menu changes later.
+  -- price is the price of ONE item including the customer's choices.
   CREATE TABLE IF NOT EXISTS order_items (
     id           INTEGER PRIMARY KEY AUTOINCREMENT,
     order_id     INTEGER NOT NULL REFERENCES orders(id) ON DELETE CASCADE,
     menu_item_id INTEGER,
     name         TEXT    NOT NULL,
+    details      TEXT    NOT NULL DEFAULT '',
     price        INTEGER NOT NULL,
     qty          INTEGER NOT NULL
   );
 
   -- Each logged-in customer's current cart (so the admin can see it).
+  -- One row per cart line. options holds the drink choices as JSON text
+  -- (or NULL for food). line_key tells apart the same drink with different choices.
   CREATE TABLE IF NOT EXISTS carts (
     user_id      INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+    line_key     TEXT    NOT NULL,
     menu_item_id INTEGER NOT NULL,
+    options      TEXT,
     qty          INTEGER NOT NULL CHECK (qty > 0),
-    PRIMARY KEY (user_id, menu_item_id)
+    PRIMARY KEY (user_id, line_key)
   );
 `);
 
 // ---------- Starter data (only the very first time) ----------
-// PRAGMA user_version is a number stored inside the database file.
-// 0 = brand new file, so we add the starter data once and set it to 1.
-function addStarterData() {
+function addMenuItems() {
   const insertItem = db.prepare(
-    "INSERT INTO menu_items (name, description, category, price, image) VALUES (?, ?, ?, ?, ?)"
+    "INSERT INTO menu_items (name, description, category, price, image, is_drink) VALUES (?, ?, ?, ?, ?, ?)"
   );
-  // The first two match the sample items already in CartContext.jsx.
-  // The other prices are placeholders: change them from the admin panel.
+  // The same six dishes the site showed before the database existed.
+  // Prices are placeholders: change them from the admin panel.
   const items = [
-    ["Caramel Latte", "Espresso, steamed milk and caramel.", "Coffee", 450, "/images/menu1.jpg"],
-    ["Chicken Club Sandwich", "Grilled chicken, egg and fresh veggies.", "Food", 650, "/images/menu2.jpg"],
-    ["Cheese Omelette", "Three eggs, melted cheese, toast.", "Food", 500, "/images/menu3.jpg"],
-    ["Chocolate Brownie", "Warm, gooey and rich.", "Dessert", 350, "/images/menu4.jpg"],
-    ["Cold Coffee", "Iced, sweet and strong.", "Coffee", 400, "/images/menu5.jpg"],
-    ["Loaded Fries", "Fries with cheese sauce and toppings.", "Food", 450, "/images/menu6.jpg"],
+    ["Caramel Latte", "Espresso, steamed milk and a ribbon of caramel.", "Hot Coffee", 450, "/images/menu1.jpg", 1],
+    ["Chicken Club Sandwich", "Grilled chicken, egg and lettuce on toasted bread.", "Snacks", 650, "/images/menu2.jpg", 0],
+    ["Cheese Omelette", "Fluffy eggs folded around melted cheese.", "Snacks", 400, "/images/menu3.jpg", 0],
+    ["Chocolate Brownie", "Fudgy brownie with a crisp top.", "Bakery", 320, "/images/menu4.jpg", 0],
+    ["Cold Coffee", "Chilled coffee blended smooth with ice and milk.", "Cold Drinks", 480, "/images/menu5.jpg", 1],
+    ["Loaded Fries", "Crispy fries with cheese sauce and jalapeños.", "Snacks", 450, "/images/menu6.jpg", 0],
   ];
   for (const item of items) {
     insertItem.run(...item);
   }
+}
+
+function addStarterData() {
+  addMenuItems();
 
   db.prepare(
     "INSERT INTO promo (id, title, description, price, active) VALUES (1, ?, ?, ?, 1)"
@@ -131,11 +153,15 @@ function addStarterData() {
   }
 }
 
-if (db.prepare("PRAGMA user_version").get().user_version === 0) {
+if (version === 0) {
   db.transaction(() => {
     addStarterData();
-    db.exec("PRAGMA user_version = 1");
+    db.exec("PRAGMA user_version = 2");
   })();
+} else if (db.prepare("SELECT COUNT(*) AS n FROM menu_items").get().n === 0) {
+  // The menu is empty (for example every item was deleted): put the six
+  // starter dishes back so the Menu page is never blank after a restart.
+  addMenuItems();
 }
 
 // ---------- First admin account ----------

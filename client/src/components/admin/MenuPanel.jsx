@@ -1,261 +1,238 @@
-import { useEffect, useState } from "react";
-import { api } from "../../api";
-import { money } from "./format";
+import { useRef, useState } from "react";
+import { Link } from "react-router-dom";
+import useMenu from "../../data/useMenu";
+import { addItem, updateItem, deleteItem } from "../../data/menuStore";
+import { CATEGORIES } from "../../data/menuOptions";
+import resizeImage from "../../data/resizeImage";
+import "../../menu.css";
 
-const emptyForm = {
+const EMPTY_FORM = {
   name: "",
-  description: "",
-  category: "Coffee",
   price: "",
-  image: "",
-  available: true,
+  category: CATEGORIES[0],
+  description: "",
+  isDrink: false,
+  soldOut: false,
+  image: "", // the picture is required
 };
 
-// The add / edit form. "item" is null when adding a new one.
-function ItemForm({ item, onSaved, onCancel }) {
-  const [form, setForm] = useState(
-    item
-      ? {
-          name: item.name,
-          description: item.description,
-          category: item.category,
-          price: String(item.price),
-          image: item.image,
-          available: item.available,
-        }
-      : emptyForm
-  );
+// Menu tab of the admin page (/admin): add, edit and delete menu items.
+// Only a logged-in admin gets here (see Admin.jsx), and the server checks again.
+function MenuPanel() {
+  const { items, loading } = useMenu();
+
+  const [form, setForm] = useState(EMPTY_FORM);
+  const [editingId, setEditingId] = useState(null); // null = adding a new item
   const [error, setError] = useState("");
+  const [notice, setNotice] = useState("");
   const [busy, setBusy] = useState(false);
+  const [fileKey, setFileKey] = useState(0); // changing it clears the file input
+  const formRef = useRef(null);
 
   function change(field, value) {
     setForm({ ...form, [field]: value });
   }
 
-  async function save(e) {
+  async function handlePicture(e) {
+    const file = e.target.files[0];
+    if (!file) return;
+    setError("");
+    try {
+      const image = await resizeImage(file);
+      setForm((f) => ({ ...f, image }));
+    } catch (err) {
+      setError(err.message);
+      setFileKey(fileKey + 1);
+    }
+  }
+
+  function resetForm() {
+    setForm(EMPTY_FORM);
+    setEditingId(null);
+    setFileKey(fileKey + 1);
+  }
+
+  async function handleSubmit(e) {
     e.preventDefault();
     setError("");
+    setNotice("");
     setBusy(true);
     try {
-      const path = item ? "/api/admin/menu/" + item.id : "/api/admin/menu";
-      await api(path, { method: item ? "PUT" : "POST", body: form });
-      onSaved();
+      if (editingId) {
+        await updateItem(editingId, form);
+        setNotice(`Saved changes to "${form.name.trim()}".`);
+      } else {
+        await addItem(form);
+        setNotice(`Added "${form.name.trim()}" to the menu.`);
+      }
+      resetForm();
     } catch (err) {
       setError(err.message);
-      setBusy(false);
+    }
+    setBusy(false);
+  }
+
+  function startEdit(item) {
+    setForm({
+      name: item.name,
+      price: String(item.price),
+      category: item.category,
+      description: item.description || "",
+      isDrink: item.isDrink,
+      soldOut: item.soldOut,
+      image: item.image,
+    });
+    setEditingId(item.id);
+    setFileKey(fileKey + 1);
+    setError("");
+    setNotice("");
+    formRef.current?.scrollIntoView({ behavior: "smooth", block: "start" });
+  }
+
+  async function handleDelete(item) {
+    if (!window.confirm(`Delete "${item.name}" from the menu?`)) return;
+    setError("");
+    setNotice("");
+    try {
+      await deleteItem(item.id);
+      if (editingId === item.id) resetForm();
+      setNotice(`Deleted "${item.name}".`);
+    } catch (err) {
+      setError(err.message);
     }
   }
 
   return (
-    <form className="admin-card" onSubmit={save}>
-      <h3 className="panel-subtitle">{item ? "Edit " + item.name : "Add a menu item"}</h3>
+    <section className="mn-page">
+      <p className="ad-intro">
+        Add, edit or remove dishes. Changes show on the{" "}
+        <Link to="/menu" className="ad-link">customer menu</Link> straight away.
+      </p>
 
-      <div className="form-grid">
-        <label className="field">
-          Name
-          <input
-            type="text"
-            required
-            maxLength={80}
-            value={form.name}
-            onChange={(e) => change("name", e.target.value)}
-          />
-        </label>
+      <div className="ad-layout">
+        <form className="checkout ad-form" onSubmit={handleSubmit} ref={formRef} noValidate>
+          <h2>{editingId ? "Edit item" : "Add item"}</h2>
 
-        <label className="field">
-          Category
-          <input
-            type="text"
-            list="menu-categories"
-            maxLength={30}
-            value={form.category}
-            onChange={(e) => change("category", e.target.value)}
-          />
-          <datalist id="menu-categories">
-            <option value="Coffee" />
-            <option value="Food" />
-            <option value="Dessert" />
-          </datalist>
-        </label>
+          <label className="field">
+            Name of the food *
+            <input
+              type="text"
+              value={form.name}
+              maxLength={60}
+              onChange={(e) => change("name", e.target.value)}
+            />
+          </label>
 
-        <label className="field">
-          Price (Rs.)
-          <input
-            type="number"
-            required
-            min="0"
-            step="1"
-            value={form.price}
-            onChange={(e) => change("price", e.target.value)}
-          />
-        </label>
+          <label className="field">
+            Price (Rs.) *
+            <input
+              type="number"
+              min="1"
+              step="1"
+              value={form.price}
+              onChange={(e) => change("price", e.target.value)}
+            />
+          </label>
 
-        <label className="field">
-          Image (like /images/menu1.jpg)
-          <input
-            type="text"
-            maxLength={200}
-            value={form.image}
-            onChange={(e) => change("image", e.target.value)}
-          />
-        </label>
-      </div>
+          <label className="field">
+            Picture of the food *
+            <input key={fileKey} type="file" accept="image/*" onChange={handlePicture} />
+          </label>
+          {form.image ? (
+            <img className="ad-preview" src={form.image} alt="Preview of the food" />
+          ) : (
+            <p className="ad-hint">No picture chosen yet.</p>
+          )}
 
-      <label className="field">
-        Description
-        <input
-          type="text"
-          maxLength={300}
-          value={form.description}
-          onChange={(e) => change("description", e.target.value)}
-        />
-      </label>
-
-      <label className="choice">
-        <input
-          type="checkbox"
-          checked={form.available}
-          onChange={(e) => change("available", e.target.checked)}
-        />{" "}
-        Available (untick to mark as sold out)
-      </label>
-
-      {error && (
-        <p className="form-error" role="alert">
-          {error}
-        </p>
-      )}
-
-      <div className="form-buttons">
-        <button type="submit" className="place-btn" disabled={busy}>
-          {busy ? "SAVING..." : "SAVE"}
-        </button>
-        <button type="button" className="btn-small" onClick={onCancel}>
-          CANCEL
-        </button>
-      </div>
-    </form>
-  );
-}
-
-function MenuPanel() {
-  const [items, setItems] = useState(null);
-  const [error, setError] = useState("");
-  // editing: null = just the list, "new" = add form, or the item being edited
-  const [editing, setEditing] = useState(null);
-
-  function load() {
-    api("/api/menu")
-      .then((data) => setItems(data.items))
-      .catch((err) => setError(err.message));
-  }
-
-  useEffect(load, []);
-
-  async function toggleSoldOut(item) {
-    setError("");
-    try {
-      await api("/api/admin/menu/" + item.id, {
-        method: "PUT",
-        body: { ...item, available: !item.available },
-      });
-      load();
-    } catch (err) {
-      setError(err.message);
-    }
-  }
-
-  async function remove(item) {
-    if (!window.confirm(`Delete "${item.name}" from the menu? This cannot be undone.`)) return;
-    setError("");
-    try {
-      await api("/api/admin/menu/" + item.id, { method: "DELETE" });
-      load();
-    } catch (err) {
-      setError(err.message);
-    }
-  }
-
-  if (!items && !error) {
-    return <p>Loading...</p>;
-  }
-
-  if (editing) {
-    return (
-      <div className="panel">
-        <h2 className="panel-title">Menu</h2>
-        <ItemForm
-          item={editing === "new" ? null : editing}
-          onCancel={() => setEditing(null)}
-          onSaved={() => {
-            setEditing(null);
-            load();
-          }}
-        />
-      </div>
-    );
-  }
-
-  return (
-    <div className="panel">
-      <h2 className="panel-title">Menu</h2>
-      <div className="toolbar">
-        <p className="panel-help">Change prices, add dishes, or mark things as sold out.</p>
-        <button className="btn-small" onClick={() => setEditing("new")}>
-          + ADD ITEM
-        </button>
-      </div>
-
-      {error && (
-        <p className="form-error" role="alert">
-          {error}
-        </p>
-      )}
-
-      {items && (
-        <div className="table-scroll">
-          <table className="data-table">
-            <thead>
-              <tr>
-                <th>Name</th>
-                <th>Category</th>
-                <th>Price</th>
-                <th>Status</th>
-                <th></th>
-              </tr>
-            </thead>
-            <tbody>
-              {items.map((item) => (
-                <tr key={item.id}>
-                  <td>
-                    {item.name}
-                    {item.description && <small className="cell-note">{item.description}</small>}
-                  </td>
-                  <td>{item.category}</td>
-                  <td>{money(item.price)}</td>
-                  <td>
-                    <span className={item.available ? "badge ok" : "badge no"}>
-                      {item.available ? "Available" : "Sold out"}
-                    </span>
-                  </td>
-                  <td className="row-buttons">
-                    <button className="btn-small" onClick={() => toggleSoldOut(item)}>
-                      {item.available ? "MARK SOLD OUT" : "MARK AVAILABLE"}
-                    </button>
-                    <button className="btn-small" onClick={() => setEditing(item)}>
-                      EDIT
-                    </button>
-                    <button className="btn-small danger" onClick={() => remove(item)}>
-                      DELETE
-                    </button>
-                  </td>
-                </tr>
+          <label className="field">
+            Category
+            <select value={form.category} onChange={(e) => change("category", e.target.value)}>
+              {CATEGORIES.map((c) => (
+                <option key={c} value={c}>
+                  {c}
+                </option>
               ))}
-            </tbody>
-          </table>
+            </select>
+          </label>
+
+          <label className="field">
+            Description (optional)
+            <textarea
+              rows={3}
+              maxLength={200}
+              value={form.description}
+              onChange={(e) => change("description", e.target.value)}
+            />
+          </label>
+
+          <label className="choice">
+            <input
+              type="checkbox"
+              checked={form.isDrink}
+              onChange={(e) => change("isDrink", e.target.checked)}
+            />{" "}
+            This is a drink (customers can pick size, milk, shots, sugar, add-ons)
+          </label>
+          <label className="choice">
+            <input
+              type="checkbox"
+              checked={form.soldOut}
+              onChange={(e) => change("soldOut", e.target.checked)}
+            />{" "}
+            Sold out (visible but cannot be ordered)
+          </label>
+
+          {error && (
+            <p className="ad-error" role="alert">
+              {error}
+            </p>
+          )}
+          {notice && (
+            <p className="ad-notice" role="status">
+              {notice}
+            </p>
+          )}
+
+          <button type="submit" className="place-btn" disabled={busy}>
+            {busy ? "SAVING…" : editingId ? "SAVE CHANGES" : "ADD TO MENU"}
+          </button>
+          {editingId && (
+            <button type="button" className="ad-cancel" onClick={resetForm}>
+              CANCEL EDIT
+            </button>
+          )}
+        </form>
+
+        <div className="ad-list">
+          <h2>On the menu ({items.length})</h2>
+          {loading ? (
+            <p className="ad-hint">Loading…</p>
+          ) : items.length === 0 ? (
+            <p className="ad-hint">The menu is empty. Add your first item.</p>
+          ) : (
+            items.map((item) => (
+              <div key={item.id} className={editingId === item.id ? "ad-row editing" : "ad-row"}>
+                <img src={item.image} alt="" />
+                <div className="ad-info">
+                  <strong>{item.name}</strong>
+                  <small>
+                    {item.category} · Rs. {item.price}
+                    {item.isDrink && " · drink"}
+                    {item.soldOut && " · SOLD OUT"}
+                  </small>
+                </div>
+                <button type="button" className="remove-btn" onClick={() => startEdit(item)}>
+                  EDIT
+                </button>
+                <button type="button" className="remove-btn" onClick={() => handleDelete(item)}>
+                  DELETE
+                </button>
+              </div>
+            ))
+          )}
         </div>
-      )}
-    </div>
+      </div>
+    </section>
   );
 }
 

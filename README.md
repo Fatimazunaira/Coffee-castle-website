@@ -1,25 +1,47 @@
 # NUST Coffee Castle
 
-## Setup
-You need Node.js 22.13 or newer (check with `node -v`).
+A cafe website: customers browse the menu, log in, order dine-in or takeaway and get a table
+automatically. The admin changes the menu and the promo banner, sees customers, their carts and
+orders, and frees tables.
 
-1. git clone <repo link>
-2. cd client; npm install
-3. cd server; npm install --legacy-peer-deps
-4. In server/, copy .env.example to .env and fill in the values (see DATABASE.md)
-5. Run server: node index.js (in server/)
-6. Run client: npm run dev (in client/), then open http://localhost:5173
+Built with React (Vite) for the website, Express for the server and SQLite for the database.
 
-The client sends every /api request to the server on port 5000 (see client/vite.config.js),
-so start the server first.
+## What you need
 
-## Logging in
-- Customers: use "LOGIN" in the top bar, then the "SIGN UP" tab.
-- Admin: log in with the ADMIN_EMAIL and ADMIN_PASSWORD from server/.env.
-  An "ADMIN" link then appears in the top bar.
+- **Node.js 22.13 or newer** (`node -v` shows yours). The database is built into Node.
 
-The admin panel (/admin) has four tabs: Customers (details, carts, orders and tables),
-Tables, Menu, and Promo banner.
+## Setup (once)
 
-## Database
-See [DATABASE.md](DATABASE.md).
+1. `git clone <repo link>`
+2. Client: `cd client` then `npm install`
+3. Server: `cd server` then `npm install --legacy-peer-deps`
+4. In `server/`, copy `.env.example` to `.env` and fill it in (see `DATABASE.md`; `JWT_SECRET` is required)
+
+## Run (two terminals, both must stay open)
+
+- Terminal 1, in `server/`: `node index.js` (you should see `Server running on http://localhost:5000`)
+- Terminal 2, in `client/`: `npm run dev`, then open http://localhost:5173
+
+If the page says it cannot reach the server, terminal 1 is not running.
+
+## Accounts
+
+- Customers sign up on the **Login** page.
+- The admin is made from `ADMIN_EMAIL` / `ADMIN_PASSWORD` in `server/.env` the first time the server
+  starts. After logging in, an **ADMIN** link appears in the navigation bar.
+  (With no `ADMIN_PASSWORD`, the development login is `admin@coffeecastle.pk` / `admin12345`.)
+
+## Folders
+
+- `client/src/pages`: Home, Menu, Cart, Login, Admin
+- `client/src/components/admin`: the four admin tabs (Customers, Tables, Menu, Promo banner)
+- `client/src/data/menuStore.js`: the only file that talks to the server about menu items
+- `server/routes`: the API (`public`, `auth`, `cart`, `orders`, `admin`)
+- `server/db.js`: the database tables
+
+More about the database: see `DATABASE.md`.
+
+## Not finished yet
+
+- "Pay by card (Stripe)" saves the order but does not charge a card.
+- The ORDER HISTORY link has no page yet.

@@ -25,9 +25,13 @@ require("./db"); // opens the database and creates the tables
 
 const app = express();
 app.use(cors());
+
+// Menu pictures are sent as text, so the admin menu routes accept bigger requests.
+// (This line must come before the general one below.)
+app.use("/api/admin/menu", express.json({ limit: "1mb" }));
 app.use(express.json({ limit: "100kb" }));
 
-app.use("/api", require("./routes/public")); // /api/promo and /api/menu
+app.use("/api", require("./routes/public").router); // /api/promo and /api/menu
 app.use("/api/auth", require("./routes/auth"));
 app.use("/api/cart", require("./routes/cart"));
 app.use("/api/orders", require("./routes/orders"));
@@ -35,6 +39,9 @@ app.use("/api/admin", require("./routes/admin"));
 
 // Last stop: any unexpected error comes here and the browser gets JSON.
 app.use((err, req, res, next) => {
+  if (err.status === 413) {
+    return res.status(413).json({ error: "That is too large to send." });
+  }
   if (err.status && err.status < 500) {
     return res.status(err.status).json({ error: "Bad request." });
   }
