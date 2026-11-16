@@ -16,7 +16,15 @@ Built with React (Vite) for the website, Express for the server and MongoDB for 
 1. `git clone https://github.com/Fatimazunaira/Coffee-castle-website`
 2. Client: `cd client` then `npm install`
 3. Server: `cd server` then `npm install`
-4. In `server/`, copy `.env.example` to `.env` and fill in `MONGODB_URI`, `JWT_SECRET`, and `ADMIN_PASSWORD` (see `DATABASE.md`)
+4. In `server/`, copy `.env.example` to `.env`. Generate a secret by running:
+
+   ```sh
+   node -e "console.log(require('crypto').randomBytes(32).toString('hex'))"
+   ```
+
+   Paste the output as the value of `JWT_SECRET` in `server/.env`, then fill in
+   `MONGODB_URI` and `ADMIN_PASSWORD` (see `DATABASE.md`). Keep `.env` private; never
+   commit or share the generated secret.
 
 ## Run (two terminals, both must stay open)
 
