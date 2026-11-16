@@ -1,5 +1,5 @@
 const jwt = require("jsonwebtoken");
-const db = require("../db");
+const { collection } = require("../db");
 
 // Make a login token for a user (valid for 7 days).
 function signToken(user) {
@@ -11,7 +11,7 @@ function signToken(user) {
 
 // Runs before any route that needs a logged-in user.
 // The browser sends:  Authorization: Bearer <token>
-function requireLogin(req, res, next) {
+async function requireLogin(req, res, next) {
   const header = req.headers.authorization || "";
   const token = header.startsWith("Bearer ") ? header.slice(7) : "";
 
@@ -19,28 +19,27 @@ function requireLogin(req, res, next) {
     return res.status(401).json({ error: "Please log in first." });
   }
 
+  let payload;
   try {
-    const payload = jwt.verify(token, process.env.JWT_SECRET, {
+    payload = jwt.verify(token, process.env.JWT_SECRET, {
       algorithms: ["HS256"],
     });
-    // Look the user up every time, so a changed role takes effect straight away.
-    const user = db
-      .prepare("SELECT id, name, email, phone, role FROM users WHERE id = ?")
-      .get(payload.id);
-
-    if (!user) {
-      return res.status(401).json({ error: "Please log in again." });
-    }
-    req.user = user;
-    next();
   } catch {
-    res.status(401).json({ error: "Your login has expired. Please log in again." });
+    return res.status(401).json({ error: "Your login has expired. Please log in again." });
   }
+
+  const user = await collection("users").findOne(
+    { id: payload.id },
+    { projection: { _id: 0, id: 1, name: 1, email: 1, phone: 1, role: 1 } }
+  );
+  if (!user) return res.status(401).json({ error: "Please log in again." });
+  req.user = user;
+  next();
 }
 
 // Same as requireLogin, but the user must also be an admin.
 function requireAdmin(req, res, next) {
-  requireLogin(req, res, () => {
+  return requireLogin(req, res, () => {
     if (req.user.role !== "admin") {
       return res.status(403).json({ error: "Admins only." });
     }

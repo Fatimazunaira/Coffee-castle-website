@@ -1,5 +1,5 @@
 const express = require("express");
-const db = require("../db");
+const { collection } = require("../db");
 
 const router = express.Router();
 
@@ -19,8 +19,11 @@ function showItem(row) {
 
 // GET /api/promo  -> the banner shown on the home page.
 // "text" is one line of words, for the small Promo component.
-router.get("/promo", (req, res) => {
-  const row = db.prepare("SELECT title, description, price, active FROM promo WHERE id = 1").get();
+router.get("/promo", async (req, res) => {
+  const row = await collection("promo").findOne(
+    { _id: 1 },
+    { projection: { _id: 0, title: 1, description: 1, price: 1, active: 1 } }
+  );
   if (!row) return res.json({ promo: null, text: "" });
 
   const promo = { ...row, active: row.active === 1 };
@@ -29,12 +32,11 @@ router.get("/promo", (req, res) => {
 });
 
 // GET /api/menu  -> every menu item (sold-out ones have soldOut: true)
-router.get("/menu", (req, res) => {
-  const rows = db
-    .prepare(
-      "SELECT id, name, description, category, price, image, is_drink, sold_out FROM menu_items ORDER BY id"
-    )
-    .all();
+router.get("/menu", async (req, res) => {
+  const rows = await collection("menu_items")
+    .find({}, { projection: { _id: 0 } })
+    .sort({ id: 1 })
+    .toArray();
   res.json({ items: rows.map(showItem) });
 });
 

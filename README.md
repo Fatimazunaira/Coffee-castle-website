@@ -4,18 +4,19 @@ A cafe website: customers browse the menu, log in, order dine-in or takeaway and
 automatically. The admin changes the menu and the promo banner, sees customers, their carts and
 orders, and frees tables.
 
-Built with React (Vite) for the website, Express for the server and SQLite for the database.
+Built with React (Vite) for the website, Express for the server and MongoDB for the database.
 
 ## What you need
 
-- **Node.js 22.13 or newer** (`node -v` shows yours). The database is built into Node.
+- **Node.js 22.13 or newer** (`node -v` shows yours).
+- A MongoDB database, such as a MongoDB Atlas cluster.
 
 ## Setup (once)
 
 1. `git clone <repo link>`
 2. Client: `cd client` then `npm install`
-3. Server: `cd server` then `npm install --legacy-peer-deps`
-4. In `server/`, copy `.env.example` to `.env` and fill it in (see `DATABASE.md`; `JWT_SECRET` is required)
+3. Server: `cd server` then `npm install`
+4. In `server/`, copy `.env.example` to `.env` and fill in `MONGODB_URI`, `JWT_SECRET`, and `ADMIN_PASSWORD` (see `server/DATABASE.md`)
 
 ## Run (two terminals, both must stay open)
 
@@ -37,9 +38,9 @@ If the page says it cannot reach the server, terminal 1 is not running.
 - `client/src/components/admin`: the four admin tabs (Customers, Tables, Menu, Promo banner)
 - `client/src/data/menuStore.js`: the only file that talks to the server about menu items
 - `server/routes`: the API (`public`, `auth`, `cart`, `orders`, `admin`)
-- `server/db.js`: the database tables
+- `server/db.js`: MongoDB connection, indexes, and initial data
 
-More about the database: see `DATABASE.md`.
+More about the database: see `server/DATABASE.md`.
 
 ## Not finished yet
 

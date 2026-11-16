@@ -1,6 +1,6 @@
 const express = require("express");
 const bcrypt = require("bcryptjs");
-const db = require("../db");
+const { collection, nextId } = require("../db");
 const { signToken, requireLogin } = require("../middleware/auth");
 
 const router = express.Router();
@@ -53,28 +53,35 @@ router.post("/register", async (req, res) => {
     return res.status(400).json({ error: "Password must be 8 to 72 characters." });
   }
 
-  if (db.prepare("SELECT 1 FROM users WHERE email = ?").get(email)) {
+  const users = collection("users");
+  if (await users.findOne({ email }, { projection: { _id: 1 } })) {
     return res.status(409).json({ error: "That email already has an account. Try logging in." });
   }
 
   const hash = await bcrypt.hash(password, 10);
 
-  let result;
   try {
     // The role is always "customer" here. Nobody can sign up as admin.
-    result = db
-      .prepare("INSERT INTO users (name, email, phone, password_hash) VALUES (?, ?, ?, ?)")
-      .run(name, email, phone || null, hash);
+    const user = {
+      id: await nextId("users"),
+      name,
+      email,
+      phone: phone || null,
+      password_hash: hash,
+      role: "customer",
+      created_at: new Date().toISOString(),
+    };
+    await users.insertOne(user);
+    res.status(201).json({
+      token: signToken(user),
+      user: { id: user.id, name, email, phone: user.phone, role: "customer" },
+    });
   } catch (err) {
-    // Someone else signed up with this email while we were hashing the password
-    if (String(err.message).includes("UNIQUE")) {
+    if (err.code === 11000) {
       return res.status(409).json({ error: "That email already has an account. Try logging in." });
     }
     throw err;
   }
-
-  const user = { id: Number(result.lastInsertRowid), name, email, phone, role: "customer" };
-  res.status(201).json({ token: signToken(user), user });
 });
 
 // POST /api/auth/login
@@ -86,7 +93,7 @@ router.post("/login", async (req, res) => {
     return res.status(429).json({ error: "Too many wrong tries. Please wait 15 minutes." });
   }
 
-  const row = db.prepare("SELECT * FROM users WHERE email = ?").get(email);
+  const row = await collection("users").findOne({ email });
   const matches = await bcrypt.compare(password, row ? row.password_hash : DUMMY_HASH);
 
   if (!row || !matches) {

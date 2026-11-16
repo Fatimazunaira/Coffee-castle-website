@@ -1,17 +1,8 @@
-// The database (node:sqlite) is built into Node.js 22.13 and newer.
-const [nodeMajor, nodeMinor] = process.versions.node.split(".").map(Number);
-if (nodeMajor < 22 || (nodeMajor === 22 && nodeMinor < 13)) {
-  console.error(
-    `This server needs Node.js 22.13 or newer, but you have ${process.versions.node}.\n` +
-      "Install the LTS version from https://nodejs.org and run it again."
-  );
-  process.exit(1);
-}
-
 require("dotenv").config({ quiet: true });
 
 const express = require("express");
 const cors = require("cors");
+const { connect } = require("./db");
 
 // Stop early, with a clear message, if the secret key is missing.
 if (!process.env.JWT_SECRET || process.env.JWT_SECRET.length < 16) {
@@ -20,8 +11,6 @@ if (!process.env.JWT_SECRET || process.env.JWT_SECRET.length < 16) {
   );
   process.exit(1);
 }
-
-require("./db"); // opens the database and creates the tables
 
 const app = express();
 app.use(cors());
@@ -50,4 +39,12 @@ app.use((err, req, res, next) => {
 });
 
 const PORT = process.env.PORT || 5000;
-app.listen(PORT, () => console.log(`Server running on http://localhost:${PORT}`));
+
+connect()
+  .then(() => {
+    app.listen(PORT, () => console.log(`Server running on http://localhost:${PORT}`));
+  })
+  .catch((err) => {
+    console.error("Could not connect to MongoDB:", err);
+    process.exit(1);
+  });
