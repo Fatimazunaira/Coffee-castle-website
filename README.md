@@ -16,7 +16,7 @@ Built with React (Vite) for the website, Express for the server and MongoDB for 
 1. `git clone <repo link>`
 2. Client: `cd client` then `npm install`
 3. Server: `cd server` then `npm install`
-4. In `server/`, copy `.env.example` to `.env` and fill in `MONGODB_URI`, `JWT_SECRET`, and `ADMIN_PASSWORD` (see `server/DATABASE.md`)
+4. In `server/`, copy `.env.example` to `.env` and fill in `MONGODB_URI`, `JWT_SECRET`, and `ADMIN_PASSWORD` (see `DATABASE.md`)
 
 ## Run (two terminals, both must stay open)
 
@@ -40,7 +40,7 @@ If the page says it cannot reach the server, terminal 1 is not running.
 - `server/routes`: the API (`public`, `auth`, `cart`, `orders`, `admin`)
 - `server/db.js`: MongoDB connection, indexes, and initial data
 
-More about the database: see `server/DATABASE.md`.
+More about the database: see `DATABASE.md`.
 
 ## Not finished yet
 
