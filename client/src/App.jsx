@@ -8,6 +8,7 @@ import Home from "./pages/Home";
 import Cart from "./pages/Cart";
 import Menu from "./pages/Menu";
 import Admin from "./pages/Admin";
+import Login from "./pages/Login";
 
 function App() {
   const [ready, setReady] = useState(false);
@@ -34,6 +35,7 @@ function App() {
             <Route path="/" element={<Home />} />
             <Route path="/menu" element={<Menu />} />
             <Route path="/cart" element={<Cart />} />
+            <Route path="/login" element={<Login />} />
             <Route path="/admin" element={<Admin />} />
           </Routes>
           <Footer />

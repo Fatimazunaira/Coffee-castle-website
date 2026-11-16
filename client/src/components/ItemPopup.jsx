@@ -49,8 +49,12 @@ function ItemPopup({ item, onClose, onAdded }) {
   function handleAdd() {
     let id = item.id;
     let details = "";
+    // Which choices the customer made (food has none). The server uses these
+    // to work out the real price, so it does not trust the price shown here.
+    let options = null;
 
     if (item.isDrink) {
+      options = { size, milk, shots, sugar, addons: addons.slice().sort() };
       // Different options = a different cart line, so the id includes them.
       id = [item.id, size, milk, shots, sugar, addons.slice().sort().join("+")].join("|");
       const parts = [sizeOpt.name, milkOpt.name];
@@ -60,7 +64,7 @@ function ItemPopup({ item, onClose, onAdded }) {
       details = parts.join(" · ");
     }
 
-    addToCart({ id, name: item.name, price: unitPrice, details }, qty);
+    addToCart({ id, name: item.name, price: unitPrice, details, itemId: item.id, options }, qty);
     onAdded(qty + " × " + item.name + " added to cart");
     onClose();
   }

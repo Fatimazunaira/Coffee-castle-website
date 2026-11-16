@@ -1,6 +1,7 @@
 import { useState, useEffect, useContext } from "react";
 import { Link } from "react-router-dom";
 import { CartContext } from "../context/CartContext";
+import { AuthContext } from "../context/AuthContext";
 
 // Opening hours (keep these the same as the footer)
 function openHourFor(day) {
@@ -49,7 +50,8 @@ function getStatus() {
 }
 
 function Navbar() {
-  const { count } = useContext(CartContext);
+  const { count, clearCart } = useContext(CartContext);
+  const { user, logout } = useContext(AuthContext);
   const [status, setStatus] = useState(getStatus());
   // menuOpen remembers if the phone menu is open or closed
   const [menuOpen, setMenuOpen] = useState(false);
@@ -62,6 +64,12 @@ function Navbar() {
 
   function closeMenu() {
     setMenuOpen(false);
+  }
+
+  function handleLogout() {
+    logout();
+    clearCart(); // the next person on this browser should not see this cart
+    closeMenu();
   }
 
   return (
@@ -99,9 +107,21 @@ function Navbar() {
   </Link>
 
 
-  <Link to="/login" onClick={closeMenu}>
-    LOGIN
-  </Link>
+  {user && user.role === "admin" && (
+    <Link to="/admin" onClick={closeMenu}>
+      ADMIN
+    </Link>
+  )}
+
+  {user ? (
+    <button type="button" className="nav-button" onClick={handleLogout}>
+      LOGOUT
+    </button>
+  ) : (
+    <Link to="/login" onClick={closeMenu}>
+      LOGIN
+    </Link>
+  )}
 </nav>
 
     </header>

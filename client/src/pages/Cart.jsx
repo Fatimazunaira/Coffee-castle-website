@@ -1,23 +1,52 @@
 import { useContext, useState } from "react";
 import { Link } from "react-router-dom";
 import { CartContext } from "../context/CartContext";
+import { AuthContext } from "../context/AuthContext";
+import { api } from "../api";
 
 function Cart() {
   const { items, total, changeQty, removeItem, clearCart } =
     useContext(CartContext);
+  const { user, loading } = useContext(AuthContext);
 
   const [orderType, setOrderType] = useState("dine-in");
   const [payment, setPayment] = useState("counter");
-  const [name, setName] = useState("");
-  const [phone, setPhone] = useState("");
-  const [placed, setPlaced] = useState(false);
+  // null = the customer has not typed anything: use the name and phone of their account
+  const [typedName, setName] = useState(null);
+  const [typedPhone, setPhone] = useState(null);
+  const name = typedName ?? (user ? user.name : "");
+  const phone = typedPhone ?? (user ? user.phone || "" : "");
+  const [placed, setPlaced] = useState(null); // the server's answer, once the order is saved
+  const [error, setError] = useState("");
+  const [busy, setBusy] = useState(false);
 
-  function placeOrder(e) {
+  async function placeOrder(e) {
     e.preventDefault();
-    // Later this will send the order to the server and to Stripe.
-    // For now it only shows the thank you message.
-    setPlaced(true);
-    clearCart();
+    setError("");
+    setBusy(true);
+    try {
+      // We send only WHICH dishes and choices. The server works out the prices.
+      // (Paying by card is not connected yet: for now the order is only saved.)
+      const result = await api("/api/orders", {
+        method: "POST",
+        body: {
+          name,
+          phone,
+          orderType,
+          payment,
+          items: items.map((item) => ({
+            itemId: item.itemId,
+            options: item.options || null,
+            qty: item.qty,
+          })),
+        },
+      });
+      setPlaced(result);
+      clearCart();
+    } catch (err) {
+      setError(err.message);
+    }
+    setBusy(false);
   }
 
   // After the order is placed
@@ -26,9 +55,29 @@ function Cart() {
       <section className="cart-page">
         <div className="cart-done">
           <h2>Thank you, {name}!</h2>
-          <p>Your order has been placed.</p>
+          <p>Your order #{placed.orderId} has been placed. Total: Rs. {placed.total}.</p>
+          {placed.table && <p>Your table is number {placed.table.number}.</p>}
+          {placed.waiting && (
+            <p>All tables are taken right now. We will give you one as soon as it is free.</p>
+          )}
           <Link to="/" className="order-btn">
             BACK TO HOME
+          </Link>
+        </div>
+      </section>
+    );
+  }
+
+  // Wait while we check the saved login, then ask guests to log in
+  if (loading) return null;
+  if (!user) {
+    return (
+      <section className="cart-page">
+        <div className="cart-done">
+          <h2>Please log in to order</h2>
+          <p>Log in or sign up so we can save your cart and give you a table.</p>
+          <Link to="/login" state={{ from: "/cart" }} className="order-btn">
+            LOG IN
           </Link>
         </div>
       </section>
@@ -150,8 +199,14 @@ function Cart() {
             <span>Rs. {total}</span>
           </div>
 
-          <button type="submit" className="place-btn">
-            PLACE ORDER
+          {error && (
+            <p className="form-error" role="alert">
+              {error}
+            </p>
+          )}
+
+          <button type="submit" className="place-btn" disabled={busy}>
+            {busy ? "PLACING…" : "PLACE ORDER"}
           </button>
         </form>
       </div>

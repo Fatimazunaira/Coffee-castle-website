@@ -1,12 +1,27 @@
+import { useEffect, useState } from "react";
 import { Link } from "react-router-dom";
+import { api } from "../api";
 
+// Shown if the server cannot be reached.
+const FALLBACK = {
+  title: "Caramel Latte",
+  description: "Buy one, get 20% off the second. Today only.",
+  price: 450,
+  active: true,
+};
+
+// The banner text comes from the database; the admin changes it in /admin.
 function PromoBanner() {
-  // For now these are fixed words. Later the admin will change them.
-  const promo = {
-    title: "Caramel Latte",
-    description: "Buy one, get 20% off the second. Today only.",
-    price: "Rs. 450",
-  };
+  const [promo, setPromo] = useState(FALLBACK);
+
+  useEffect(() => {
+    api("/api/promo")
+      .then((data) => setPromo(data.promo))
+      .catch(() => {}); // keep the fallback text
+  }, []);
+
+  // the admin can switch the banner off
+  if (!promo.active) return null;
 
   return (
     <section className="promo">
@@ -18,7 +33,9 @@ function PromoBanner() {
       </div>
 
       <div className="promo-right">
-        <p className="promo-price">{promo.price}</p>
+        {promo.price !== null && promo.price !== undefined && (
+          <p className="promo-price">Rs. {promo.price}</p>
+        )}
         <Link to="/menu" className="order-btn">
           ORDER NOW
         </Link>
