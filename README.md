@@ -13,7 +13,7 @@ Built with React (Vite) for the website, Express for the server and MongoDB for 
 
 ## Setup (once)
 
-1. `git clone <repo link>`
+1. `git clone https://github.com/Fatimazunaira/Coffee-castle-website`
 2. Client: `cd client` then `npm install`
 3. Server: `cd server` then `npm install`
 4. In `server/`, copy `.env.example` to `.env` and fill in `MONGODB_URI`, `JWT_SECRET`, and `ADMIN_PASSWORD` (see `DATABASE.md`)
