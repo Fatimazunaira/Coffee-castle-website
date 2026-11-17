@@ -39,6 +39,7 @@ async function connect() {
     database.collection("cafe_tables").createIndex({ number: 1 }, { unique: true }),
     database.collection("orders").createIndex({ id: 1 }, { unique: true }),
     database.collection("orders").createIndex({ user_id: 1, id: -1 }),
+    database.collection("orders").createIndex({ order_type: 1, table_id: 1, id: 1 }),
     database.collection("carts").createIndex({ user_id: 1 }, { unique: true }),
   ]);
 

@@ -58,7 +58,7 @@ The server creates these indexes at startup:
 | `users` | Unique `id`; unique `email` |
 | `menu_items` | Unique `id` |
 | `cafe_tables` | Unique `id`; unique `number` |
-| `orders` | Unique `id`; `{ user_id: 1, id: -1 }` for a customer's recent orders |
+| `orders` | Unique `id`; `{ user_id: 1, id: -1 }` for a customer's recent orders; `{ order_type: 1, table_id: 1, id: 1 }` for the oldest waiting dine-in order |
 | `carts` | Unique `user_id` |
 
 `promo._id` and `counters._id` are unique through MongoDB's built-in `_id` index. The app
