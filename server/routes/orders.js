@@ -1,5 +1,5 @@
 const express = require("express");
-const { collection, nextId } = require("../db");
+const { client, collection, nextId } = require("../db");
 const { requireLogin } = require("../middleware/auth");
 const { checkLines } = require("../cartLines");
 
@@ -34,50 +34,52 @@ router.post("/", requireLogin, async (req, res) => {
   }
 
   const total = lines.reduce((sum, line) => sum + line.price * line.qty, 0);
-  const orderId = await nextId("orders");
+  let orderId;
   let table = null;
-
-  if (body.orderType === "dine-in") {
-    table = await collection("cafe_tables").findOneAndUpdate(
-      { $or: [{ order_id: null }, { order_id: { $exists: false } }] },
-      { $set: { order_id: orderId } },
-      { sort: { number: 1 }, returnDocument: "after" }
-    );
-  }
-
-  const order = {
-    id: orderId,
-    user_id: req.user.id,
-    customer_name: name,
-    phone,
-    order_type: body.orderType,
-    payment: body.payment,
-    total,
-    status: "received",
-    table_id: table ? table.id : null,
-    created_at: new Date().toISOString(),
-    items: lines.map((line) => ({
-      menu_item_id: line.itemId,
-      name: line.name,
-      details: line.details,
-      price: line.price,
-      qty: line.qty,
-    })),
-  };
+  const session = client.startSession();
 
   try {
-    await collection("orders").insertOne(order);
-  } catch (err) {
-    if (table) {
-      await collection("cafe_tables").updateOne(
-        { id: table.id, order_id: orderId },
-        { $set: { order_id: null } }
-      );
-    }
-    throw err;
+    await session.withTransaction(async () => {
+      orderId = await nextId("orders", session);
+      table = null;
+
+      if (body.orderType === "dine-in") {
+        table = await collection("cafe_tables").findOneAndUpdate(
+          {
+            $or: [{ order_id: null }, { order_id: { $exists: false } }],
+          },
+          { $set: { order_id: orderId } },
+          { sort: { number: 1 }, returnDocument: "after", session }
+        );
+      }
+
+      const order = {
+        id: orderId,
+        user_id: req.user.id,
+        customer_name: name,
+        phone,
+        order_type: body.orderType,
+        payment: body.payment,
+        total,
+        status: "received",
+        table_id: table ? table.id : null,
+        created_at: new Date().toISOString(),
+        items: lines.map((line) => ({
+          menu_item_id: line.itemId,
+          name: line.name,
+          details: line.details,
+          price: line.price,
+          qty: line.qty,
+        })),
+      };
+
+      await collection("orders").insertOne(order, { session });
+      await collection("carts").deleteOne({ user_id: req.user.id }, { session });
+    });
+  } finally {
+    await session.endSession();
   }
 
-  await collection("carts").deleteOne({ user_id: req.user.id });
   res.status(201).json({
     orderId,
     total,

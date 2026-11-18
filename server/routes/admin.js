@@ -1,5 +1,5 @@
 const express = require("express");
-const { collection, nextId } = require("../db");
+const { client, collection, nextId } = require("../db");
 const { requireAdmin } = require("../middleware/auth");
 const { CATEGORIES } = require("../menuOptions");
 const { loadCart, showLine } = require("../cartLines");
@@ -145,40 +145,49 @@ router.get("/tables", async (req, res) => {
 });
 
 async function freeTable(tableId) {
-  const tables = collection("cafe_tables");
-  const table = await tables.findOne({ id: tableId });
-  if (!table) return false;
+  const session = client.startSession();
+  let found = false;
 
-  if (table.order_id != null) {
-    await collection("orders").updateOne(
-      { id: table.order_id },
-      { $set: { status: "completed" } }
-    );
-  }
-  const released = await tables.updateOne(
-    { id: tableId, order_id: table.order_id },
-    { $set: { order_id: null } }
-  );
-  if (!released.matchedCount) return true;
+  try {
+    await session.withTransaction(async () => {
+      const tables = collection("cafe_tables");
+      const table = await tables.findOne({ id: tableId }, { session });
+      if (!table) return;
+      found = true;
 
-  const next = await collection("orders").findOneAndUpdate(
-    { order_type: "dine-in", table_id: null, status: { $ne: "completed" } },
-    { $set: { table_id: tableId } },
-    { sort: { id: 1 }, returnDocument: "after" }
-  );
-  if (next) {
-    const assigned = await tables.updateOne(
-      { id: tableId, order_id: null },
-      { $set: { order_id: next.id } }
-    );
-    if (!assigned.matchedCount) {
-      await collection("orders").updateOne(
-        { id: next.id, table_id: tableId },
-        { $set: { table_id: null } }
+      if (table.order_id != null) {
+        await collection("orders").updateOne(
+          { id: table.order_id },
+          { $set: { status: "completed" } },
+          { session }
+        );
+      }
+
+      await tables.updateOne(
+        { id: tableId, order_id: table.order_id },
+        { $set: { order_id: null } },
+        { session }
       );
-    }
+
+      const next = await collection("orders").findOneAndUpdate(
+        { order_type: "dine-in", table_id: null, status: { $ne: "completed" } },
+        { $set: { table_id: tableId } },
+        { sort: { id: 1 }, returnDocument: "after", session }
+      );
+
+      if (next) {
+        await tables.updateOne(
+          { id: tableId, order_id: null },
+          { $set: { order_id: next.id } },
+          { session }
+        );
+      }
+    });
+  } finally {
+    await session.endSession();
   }
-  return true;
+
+  return found;
 }
 
 router.post("/tables/:id/free", async (req, res) => {
