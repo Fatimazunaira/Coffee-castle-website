@@ -1,5 +1,6 @@
 const { MongoClient } = require("mongodb");
 const bcrypt = require("bcryptjs");
+const { applyCollectionValidators } = require("./validators");
 
 if (!process.env.MONGODB_URI) {
   throw new Error("MONGODB_URI is missing. Set it in server/.env.");
@@ -30,6 +31,8 @@ async function connect() {
   if (database) return database;
   await client.connect();
   database = client.db();
+
+  await applyCollectionValidators(database);
 
   await Promise.all([
     database.collection("users").createIndex({ id: 1 }, { unique: true }),

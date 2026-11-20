@@ -61,9 +61,23 @@ The server creates these indexes at startup:
 | `orders` | Unique `id`; `{ user_id: 1, id: -1 }` for a customer's recent orders; `{ order_type: 1, table_id: 1, id: 1 }` for the oldest waiting dine-in order |
 | `carts` | Unique `user_id` |
 
-`promo._id` and `counters._id` are unique through MongoDB's built-in `_id` index. The app
-does not currently define MongoDB collection validators or a migration system; validation
-is primarily performed in the API.
+`promo._id` and `counters._id` are unique through MongoDB's built-in `_id` index. At startup,
+the server applies strict MongoDB JSON Schema validators to `users`, `menu_items`, `orders`,
+`carts`, and `cafe_tables`. They enforce the required fields, BSON types, and documented
+allowed values; the API still performs user-friendly input validation. Validators are applied
+to existing collections with `collMod` and do not rewrite or scan existing documents. The
+MongoDB application user must be allowed to create collections and run `collMod`.
+
+Run the validator integration test from `server/` with `MONGODB_TEST_URI` pointed at a
+disposable MongoDB instance, for example:
+
+```powershell
+$env:MONGODB_TEST_URI = "mongodb://127.0.0.1:27017"
+npm test
+```
+
+The test creates and drops a uniquely named test database. Do not point
+`MONGODB_TEST_URI` at a production database.
 
 ### Dine-in order and table lifecycle
 
