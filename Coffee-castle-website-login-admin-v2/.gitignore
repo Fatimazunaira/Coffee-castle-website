@@ -1,7 +1,0 @@
-node_modules/
-.env
-
-# local SQLite database (each teammate has their own)
-*.db
-*.db-shm
-*.db-wal
