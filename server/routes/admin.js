@@ -1,5 +1,5 @@
 const express = require("express");
-const { client, collection, nextId } = require("../db");
+const { collection, nextId } = require("../db");
 const { requireAdmin } = require("../middleware/auth");
 const { CATEGORIES } = require("../menuOptions");
 const { loadCart, showLine } = require("../cartLines");
@@ -145,49 +145,36 @@ router.get("/tables", async (req, res) => {
 });
 
 async function freeTable(tableId) {
-  const session = client.startSession();
-  let found = false;
+  const tables = collection("cafe_tables");
+  const orders = collection("orders");
 
-  try {
-    await session.withTransaction(async () => {
-      const tables = collection("cafe_tables");
-      const table = await tables.findOne({ id: tableId }, { session });
-      if (!table) return;
-      found = true;
+  const table = await tables.findOne({ id: tableId });
+  if (!table) return false;
 
-      if (table.order_id != null) {
-        await collection("orders").updateOne(
-          { id: table.order_id },
-          { $set: { status: "completed" } },
-          { session }
-        );
-      }
-
-      await tables.updateOne(
-        { id: tableId, order_id: table.order_id },
-        { $set: { order_id: null } },
-        { session }
-      );
-
-      const next = await collection("orders").findOneAndUpdate(
-        { order_type: "dine-in", table_id: null, status: { $ne: "completed" } },
-        { $set: { table_id: tableId } },
-        { sort: { id: 1 }, returnDocument: "after", session }
-      );
-
-      if (next) {
-        await tables.updateOne(
-          { id: tableId, order_id: null },
-          { $set: { order_id: next.id } },
-          { session }
-        );
-      }
-    });
-  } finally {
-    await session.endSession();
+  if (table.order_id != null) {
+    await orders.updateOne({ id: table.order_id }, { $set: { status: "completed" } });
   }
 
-  return found;
+  // Only frees the table if nobody changed it in the meantime.
+  await tables.updateOne({ id: tableId, order_id: table.order_id }, { $set: { order_id: null } });
+
+  // Give the table to the oldest dine-in order that is still waiting.
+  // findOneAndUpdate is atomic, so two admins clicking together cannot grab the same order.
+  const next = await orders.findOneAndUpdate(
+    { order_type: "dine-in", table_id: null, status: { $ne: "completed" } },
+    { $set: { table_id: tableId } },
+    { sort: { id: 1 }, returnDocument: "after" }
+  );
+
+  if (next) {
+    const seated = await tables.updateOne({ id: tableId, order_id: null }, { $set: { order_id: next.id } });
+    if (seated.matchedCount === 0) {
+      // The table was taken by a new order first, so put this order back in the queue.
+      await orders.updateOne({ id: next.id }, { $set: { table_id: null } });
+    }
+  }
+
+  return true;
 }
 
 router.post("/tables/:id/free", async (req, res) => {

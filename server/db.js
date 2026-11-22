@@ -44,6 +44,11 @@ async function connect() {
     database.collection("orders").createIndex({ user_id: 1, id: -1 }),
     database.collection("orders").createIndex({ order_type: 1, table_id: 1, id: 1 }),
     database.collection("carts").createIndex({ user_id: 1 }, { unique: true }),
+    // One order can sit at only one table (several free tables with order_id: null are fine).
+    database.collection("cafe_tables").createIndex(
+      { order_id: 1 },
+      { unique: true, partialFilterExpression: { order_id: { $type: "number" } } }
+    ),
   ]);
 
   await seedDefaults();

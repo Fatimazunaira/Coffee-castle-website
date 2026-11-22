@@ -1,5 +1,5 @@
 const express = require("express");
-const { client, collection, nextId } = require("../db");
+const { collection, nextId } = require("../db");
 const { requireLogin } = require("../middleware/auth");
 const { checkLines } = require("../cartLines");
 
@@ -34,51 +34,55 @@ router.post("/", requireLogin, async (req, res) => {
   }
 
   const total = lines.reduce((sum, line) => sum + line.price * line.qty, 0);
-  let orderId;
+
+  // No transaction here on purpose: transactions need a replica set, and a plain
+  // local MongoDB does not have one. Every step below is a single atomic write,
+  // and if the order cannot be saved we give the table back.
+  const orderId = await nextId("orders");
   let table = null;
-  const session = client.startSession();
+
+  if (body.orderType === "dine-in") {
+    // Atomic: only one request can claim a given free table.
+    table = await collection("cafe_tables").findOneAndUpdate(
+      { order_id: null },
+      { $set: { order_id: orderId } },
+      { sort: { number: 1 }, returnDocument: "after" }
+    );
+  }
 
   try {
-    await session.withTransaction(async () => {
-      orderId = await nextId("orders", session);
-      table = null;
-
-      if (body.orderType === "dine-in") {
-        table = await collection("cafe_tables").findOneAndUpdate(
-          {
-            $or: [{ order_id: null }, { order_id: { $exists: false } }],
-          },
-          { $set: { order_id: orderId } },
-          { sort: { number: 1 }, returnDocument: "after", session }
-        );
-      }
-
-      const order = {
-        id: orderId,
-        user_id: req.user.id,
-        customer_name: name,
-        phone,
-        order_type: body.orderType,
-        payment: body.payment,
-        total,
-        status: "received",
-        table_id: table ? table.id : null,
-        created_at: new Date().toISOString(),
-        items: lines.map((line) => ({
-          menu_item_id: line.itemId,
-          name: line.name,
-          details: line.details,
-          price: line.price,
-          qty: line.qty,
-        })),
-      };
-
-      await collection("orders").insertOne(order, { session });
-      await collection("carts").deleteOne({ user_id: req.user.id }, { session });
+    await collection("orders").insertOne({
+      id: orderId,
+      user_id: req.user.id,
+      customer_name: name,
+      phone,
+      order_type: body.orderType,
+      payment: body.payment,
+      total,
+      status: "received",
+      table_id: table ? table.id : null,
+      created_at: new Date().toISOString(),
+      items: lines.map((line) => ({
+        menu_item_id: line.itemId,
+        name: line.name,
+        details: line.details,
+        price: line.price,
+        qty: line.qty,
+      })),
     });
-  } finally {
-    await session.endSession();
+  } catch (err) {
+    if (table) {
+      await collection("cafe_tables")
+        .updateOne({ id: table.id, order_id: orderId }, { $set: { order_id: null } })
+        .catch((undoError) => console.error("Could not release table:", undoError));
+    }
+    throw err;
   }
+
+  // The order is saved. Clearing the cart is best-effort: if it fails, the order still stands.
+  await collection("carts")
+    .deleteOne({ user_id: req.user.id })
+    .catch((err) => console.error("Could not clear cart:", err));
 
   res.status(201).json({
     orderId,
