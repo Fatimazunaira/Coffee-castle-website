@@ -24,6 +24,7 @@ app.use("/api", require("./routes/public").router); // /api/promo and /api/menu
 app.use("/api/auth", require("./routes/auth"));
 app.use("/api/cart", require("./routes/cart"));
 app.use("/api/orders", require("./routes/orders"));
+app.use("/api/tables", require("./routes/tables"));
 app.use("/api/admin", require("./routes/admin"));
 
 // Last stop: any unexpected error comes here and the browser gets JSON.

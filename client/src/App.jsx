@@ -9,6 +9,7 @@ import Cart from "./pages/Cart";
 import Menu from "./pages/Menu";
 import Admin from "./pages/Admin";
 import Login from "./pages/Login";
+import Tables from "./pages/Tables";
 
 function App() {
   const [ready, setReady] = useState(false);
@@ -34,6 +35,7 @@ function App() {
           <Routes>
             <Route path="/" element={<Home />} />
             <Route path="/menu" element={<Menu />} />
+            <Route path="/tables" element={<Tables />} />
             <Route path="/cart" element={<Cart />} />
             <Route path="/login" element={<Login />} />
             <Route path="/admin" element={<Admin />} />

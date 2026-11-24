@@ -32,7 +32,7 @@ are stored as `0` or `1`.
 | `users` | `id` integer; `name` string; `email` lowercase string; `phone` string or `null`; `password_hash` bcrypt string; `role` is `customer` or `admin`; `created_at` ISO date string. |
 | `menu_items` | `id` integer; `name`, `description`, `category`, and `image` strings; `price` integer; `is_drink` and `sold_out` are `0` or `1`. Drink choice definitions and their prices are maintained in server code, not stored per menu item. |
 | `promo` | Singleton document with `_id: 1`; `title` and `description` strings; `price` integer or `null`; `active` is `0` or `1`. |
-| `cafe_tables` | `id` integer; `number` and `seats` integers; `order_id` integer referencing `orders.id`, or `null` when unoccupied. |
+| `cafe_tables` | `id` integer; `number` and `seats` integers; `order_id` integer referencing `orders.id`, or `null` when unoccupied; `shape` is `round`, `square` or `rect`; `x`, `y` (centre) and `w`, `h` (size) place the table on the 360 x 480 floor plan. There are exactly 7 tables, defined in `server/tableLayout.js` and copied into MongoDB at startup. |
 | `orders` | `id` integer; `user_id` references `users.id`; `customer_name` and `phone` strings; `order_type` is `dine-in` or `takeaway`; `payment` is the `counter` or `stripe` method label; `total` integer; `status` is currently `received` or `completed`; `table_id` references `cafe_tables.id` or is `null`; `created_at` ISO date string; `items` is an immutable-at-checkout item snapshot (see below). |
 | `carts` | One document per `user_id`; `lines` array contains `line_key` string, `menu_item_id` referencing `menu_items.id`, `options` object or `null`, and `qty` integer. Drink `options` contain `size`, `milk`, `shots`, `sugar`, and `addons`; non-drink options are `null`. |
 | `counters` | One document per counter; `_id` is the collection name and `sequence` is the last allocated integer. |
@@ -58,7 +58,7 @@ The server creates these indexes at startup:
 | `users` | Unique `id`; unique `email` |
 | `menu_items` | Unique `id` |
 | `cafe_tables` | Unique `id`; unique `number` |
-| `orders` | Unique `id`; `{ user_id: 1, id: -1 }` for a customer's recent orders; `{ order_type: 1, table_id: 1, id: 1 }` for the oldest waiting dine-in order |
+| `orders` | Unique `id`; `{ user_id: 1, id: -1 }` for a customer's recent orders; `{ order_type: 1, table_id: 1, id: 1 }`; unique partial `{ user_id: 1 }` (only `dine-in`, `received`, with a table) so a guest has one active table |
 | `carts` | Unique `user_id` |
 
 `promo._id` and `counters._id` are unique through MongoDB's built-in `_id` index. At startup,
@@ -81,15 +81,25 @@ The test creates and drops a uniquely named test database. Do not point
 
 ### Dine-in order and table lifecycle
 
-- A dine-in order claims the lowest-numbered free table. The order stores its `table_id`,
-  and the table stores the order's `order_id`.
-- If all tables are occupied, the order is saved with `table_id: null` and is queued;
-  the order response reports `waiting: true`.
-- Freeing an occupied table marks its current order `completed`, releases the table, and
-  assigns the oldest waiting dine-in order (lowest order `id`) if one exists.
-- A completed order retains its `table_id` as history, even after the table is released or
-  assigned to another order.
-- A takeaway order has `table_id: null`, but is not part of the dine-in waiting queue.
+- Guests pick a table on the floor plan (`/tables`: green = free, red = booked). Picking only
+  remembers the choice in the browser; it does **not** hold the table. There are no reservations.
+- Placing a dine-in order must include `tableId`. The server claims it with one atomic update
+  (`order_id: null` -> the new order's id). If two guests order the same table at the same moment
+  exactly one update matches; the other gets HTTP 409 `TABLE_TAKEN`, keeps their cart and picks
+  another table.
+- One guest, one table: a guest with an active dine-in order (`status: received`, has a `table_id`)
+  gets 409 `ACTIVE_ORDER` for another dine-in order. This is enforced three ways: a check before
+  claiming, the unique partial index `one_active_dine_in_per_user` on `orders`, and a check after
+  saving that undoes the newest order if the guest somehow has two. Takeaway orders are unaffected.
+- If saving the order fails after a table was claimed, the table is released.
+- Freeing an occupied table (admin) marks its order `completed` and releases the table. There is no
+  waiting queue any more: if every table is booked, guests can still order takeaway.
+- A completed order keeps its `table_id` as history.
+- A takeaway order has `table_id: null`.
+- Upgrading an existing database: tables 1 to 7 get their floor-plan fields; old tables 8 to 10 that are
+  free are deleted at startup, and occupied ones stay visible in the admin Tables tab (but not on the
+  guest plan) until you free them, then they are deleted. Dine-in orders that were still queued under
+  the old system (`table_id: null`) are left as they are; the old queue no longer seats them.
 
 The order insert and table updates span multiple documents and are not wrapped in a MongoDB
 transaction. The order-creation route releases a claimed table if inserting the order
@@ -98,19 +108,12 @@ concurrent table-free operation can still leave the two references out of sync. 
 recovery and concurrency testing as a backend follow-up; transactions would require a
 MongoDB replica-set deployment.
 
-Before changing this flow, verify it against a disposable test database:
+Before changing this flow, run `server/test/table-race.mjs` against a disposable database (see the
+comment at the top of that file). It checks the double-booking, one-table-per-guest and free-up cases.
 
-1. With free tables, a dine-in order gets the lowest free table and both references match.
-2. With no free tables, a dine-in order is queued; freeing a table assigns the oldest
-   waiting order and removes it from the waiting count.
-3. A takeaway order never occupies a table or enters the dine-in queue.
-4. If order insertion fails after a table is claimed, the table is released.
-5. Exercise concurrent order creation and table freeing, then confirm each occupied table
-   references exactly one existing, non-completed order, and every active order with a
-   `table_id` is the order referenced by that table. Completed orders are historical.
-
-On startup, the server creates required indexes and adds the default menu, promo, and tables
-when those collections are empty. Existing partially populated menu or table collections
+On startup, the server creates required indexes and adds the default menu and promo when those
+collections are empty, and syncs the 7 tables from `server/tableLayout.js` (free tables left over from
+the old 10-table setup are deleted). Existing partially populated menu or table collections
 are not automatically backfilled. It creates the admin account from `ADMIN_EMAIL` and
 `ADMIN_PASSWORD` only if no admin exists.
 

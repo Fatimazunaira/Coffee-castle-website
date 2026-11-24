@@ -1,7 +1,6 @@
 # NUST Coffee Castle
 
-A cafe website: customers browse the menu, log in, order dine-in or takeaway and get a table
-automatically. The admin changes the menu and the promo banner, sees customers, their carts and
+A cafe website: customers browse the menu, log in, order dine-in or takeaway. Dine-in guests pick a free table on a zoomable floor plan. The admin changes the menu and the promo banner, sees customers, their carts and
 orders, and frees tables.
 
 Built with React (Vite) for the website, Express for the server and MongoDB for the database.
@@ -42,10 +41,11 @@ If the page says it cannot reach the server, terminal 1 is not running.
 
 ## Folders
 
-- `client/src/pages`: Home, Menu, Cart, Login, Admin
+- `client/src/pages`: Home, Menu, Tables (floor plan), Cart, Login, Admin
 - `client/src/components/admin`: the four admin tabs (Customers, Tables, Menu, Promo banner)
 - `client/src/data/menuStore.js`: the only file that talks to the server about menu items
-- `server/routes`: the API (`public`, `auth`, `cart`, `orders`, `admin`)
+- `server/routes`: the API (`public`, `auth`, `cart`, `orders`, `tables`, `admin`)
+- `server/tableLayout.js`: the 7 tables and where they sit on the floor plan
 - `server/db.js`: MongoDB connection, indexes, and initial data
 
 More about the database: see `DATABASE.md`.

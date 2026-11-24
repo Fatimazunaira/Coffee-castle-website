@@ -47,4 +47,22 @@ function requireAdmin(req, res, next) {
   });
 }
 
-module.exports = { signToken, requireLogin, requireAdmin };
+// For pages anyone may look at, but that show a little more to a logged-in guest.
+// A missing or bad token just means "guest": it never fails the request.
+async function optionalLogin(req, res, next) {
+  const header = req.headers.authorization || "";
+  const token = header.startsWith("Bearer ") ? header.slice(7) : "";
+  if (!token) return next();
+  try {
+    const payload = jwt.verify(token, process.env.JWT_SECRET, { algorithms: ["HS256"] });
+    req.user = await collection("users").findOne(
+      { id: payload.id },
+      { projection: { _id: 0, id: 1, name: 1, email: 1, phone: 1, role: 1 } }
+    );
+  } catch {
+    // treat as a guest
+  }
+  next();
+}
+
+module.exports = { signToken, requireLogin, requireAdmin, optionalLogin };

@@ -1,0 +1,244 @@
+/* ---------- Choose-a-table page + the table banner on Menu and Cart ---------- */
+
+.tb-page {
+  max-width: 520px;
+  margin: 0 auto;
+  padding: 110px 16px 80px;
+  box-sizing: border-box;
+}
+
+.tb-heading {
+  text-align: center;
+  margin-bottom: 18px;
+}
+
+.tb-script {
+  display: block;
+  font-family: 'Pinyon Script', cursive;
+  font-size: 42px;
+  color: var(--red);
+  transform: rotate(-3deg);
+  margin-bottom: -12px;
+}
+
+.tb-heading h1 {
+  font-family: 'DM Serif Display', serif;
+  font-weight: 400;
+  font-size: 56px;
+  color: var(--green);
+  margin: 0;
+}
+
+.tb-heading p {
+  margin: 10px 0 0;
+  font-size: 13px;
+}
+
+.tb-loading {
+  text-align: center;
+  padding: 40px 0;
+}
+
+.tb-error {
+  background: #f6d9d4;
+  border: 1px solid var(--red);
+  padding: 10px 12px;
+  font-size: 13px;
+  margin: 0 0 12px;
+}
+
+.tb-legend {
+  display: flex;
+  justify-content: center;
+  gap: 18px;
+  list-style: none;
+  padding: 0;
+  margin: 0 0 10px;
+  font-size: 13px;
+}
+
+.tb-dot {
+  display: inline-block;
+  width: 12px;
+  height: 12px;
+  border-radius: 50%;
+  vertical-align: -1px;
+  margin-right: 4px;
+}
+
+.tb-dot.free { background: #2f9e5b; }
+.tb-dot.booked { background: #c0392b; }
+.tb-dot.mine { background: #2f9e5b; box-shadow: 0 0 0 2px var(--cream), 0 0 0 4px #e0a800; }
+
+/* ----- the floor plan ----- */
+.fp-wrap {
+  position: relative;
+  border: 2px solid var(--dark);
+  border-radius: 16px;
+  overflow: hidden;
+  background: #fffaf3;
+  /* the plan handles every touch itself (drag, pinch) */
+  touch-action: none;
+  user-select: none;
+  -webkit-user-select: none;
+}
+
+.fp-svg {
+  display: block;
+  width: 100%;
+  height: auto;
+  max-height: 72dvh;
+  touch-action: none;
+  cursor: grab;
+}
+
+.fp-svg:active { cursor: grabbing; }
+
+.fp-floor { fill: #fffaf3; }
+
+.fp-door {
+  font-size: 9px;
+  letter-spacing: 3px;
+  fill: #9a8f80;
+}
+
+.fp-chair { fill: #fff; stroke: #7a7a7a; stroke-width: 1; }
+.fp-chair-back { fill: #cfc9c0; stroke: #7a7a7a; stroke-width: 0.8; }
+
+.fp-table { cursor: pointer; outline: none; }
+.fp-table.booked { cursor: not-allowed; }
+
+.fp-hit { fill: transparent; }
+
+.fp-top { stroke: #fff; stroke-width: 2; transition: fill 0.2s; }
+.fp-table.free .fp-top,
+.fp-table.mine .fp-top { fill: #2f9e5b; }
+.fp-table.booked .fp-top { fill: #c0392b; }
+
+.fp-table.mine .fp-top { stroke: #e0a800; stroke-width: 4; }
+
+.fp-table.selected .fp-top {
+  stroke: var(--dark);
+  stroke-width: 3.5;
+}
+
+.fp-table:focus-visible .fp-top {
+  stroke: var(--dark);
+  stroke-width: 3.5;
+  stroke-dasharray: 4 2;
+}
+
+.fp-num {
+  font-family: 'DM Serif Display', serif;
+  font-size: 17px;
+  fill: #fff;
+  pointer-events: none;
+}
+
+.fp-seats {
+  font-size: 7px;
+  fill: #fff;
+  pointer-events: none;
+}
+
+.fp-controls {
+  position: absolute;
+  bottom: 8px;
+  left: 8px;
+  display: flex;
+  gap: 6px;
+}
+
+.fp-controls button {
+  width: 40px;
+  height: 40px;
+  border-radius: 10px;
+  border: 2px solid var(--dark);
+  background: var(--cream);
+  color: var(--dark);
+  font-size: 22px;
+  line-height: 1;
+  cursor: pointer;
+}
+
+.fp-controls button:active { background: #ecd2b2; }
+
+.tb-hint {
+  text-align: center;
+  font-size: 12px;
+  margin: 8px 0 14px;
+  opacity: 0.8;
+}
+
+.tb-card {
+  background: #fff;
+  border: 2px solid var(--dark);
+  border-radius: 14px;
+  padding: 14px 16px;
+  font-size: 14px;
+}
+
+.tb-card p { margin: 0 0 6px; }
+
+.tb-card-title {
+  font-family: 'DM Serif Display', serif;
+  font-size: 24px;
+  color: var(--green);
+}
+
+.tb-actions {
+  display: flex;
+  gap: 10px;
+  align-items: center;
+  margin-top: 10px;
+}
+
+.tb-actions .order-btn {
+  margin-top: 0;
+  padding: 10px 18px;
+  font-family: inherit;
+  font-size: 14px;
+  background: var(--cream);
+  color: var(--dark);
+  cursor: pointer;
+}
+
+.tb-ghost {
+  background: none;
+  border: 2px solid var(--dark);
+  border-radius: 6px;
+  padding: 10px 14px;
+  font-family: inherit;
+  font-size: 13px;
+  cursor: pointer;
+  color: var(--dark);
+}
+
+/* ----- the banner on the Menu page and Cart page ----- */
+.tc-banner {
+  max-width: 760px;
+  margin: 0 auto 24px;
+  padding: 12px 16px;
+  border: 2px solid var(--green);
+  border-radius: 12px;
+  background: #eef3e6;
+  font-size: 14px;
+  text-align: center;
+}
+
+.tc-banner a { text-decoration: underline; font-weight: 700; }
+.tc-banner.plain { border-color: var(--dark); background: #fffaf3; }
+
+.tc-pick {
+  margin: 4px 0 10px;
+  padding: 10px 12px;
+  border: 2px dashed var(--dark);
+  border-radius: 10px;
+  font-size: 14px;
+}
+
+.tc-pick a { text-decoration: underline; font-weight: 700; }
+
+@media (max-width: 480px) {
+  .tb-heading h1 { font-size: 46px; }
+}

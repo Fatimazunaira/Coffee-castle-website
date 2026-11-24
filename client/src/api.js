@@ -64,6 +64,7 @@ export async function api(path, { method = "GET", body } = {}) {
   if (!res.ok) {
     const error = new Error((data && data.error) || "Something went wrong. Please try again.");
     error.status = res.status;
+    error.code = data && data.code;
     throw error;
   }
   return data;

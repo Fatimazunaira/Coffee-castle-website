@@ -4,14 +4,12 @@ import { formatDate } from "./format";
 
 function TablesPanel() {
   const [tables, setTables] = useState(null);
-  const [waiting, setWaiting] = useState(0);
   const [error, setError] = useState("");
 
   function load() {
     api("/api/admin/tables")
       .then((data) => {
         setTables(data.tables);
-        setWaiting(data.waiting);
       })
       .catch((err) => setError(err.message));
   }
@@ -27,7 +25,6 @@ function TablesPanel() {
     try {
       const data = await api("/api/admin/tables/" + table.id + "/free", { method: "POST" });
       setTables(data.tables);
-      setWaiting(data.waiting);
     } catch (err) {
       setError(err.message);
     }
@@ -41,11 +38,12 @@ function TablesPanel() {
     <div className="panel">
       <h2 className="panel-title">Tables</h2>
       <p className="panel-help">
-        Tables are given to dine-in customers automatically. Press "Free" when they leave.
+        Guests choose their own table on the website; it is booked when they place the order. Press
+        "Free" when they leave so the next guest can choose it.
       </p>
       <div className="toolbar">
         <p className="group-title">
-          {waiting === 0 ? "Nobody is waiting for a table." : waiting + " customer(s) waiting for a table."}
+          {tables ? tables.filter((t) => t.status === "free").length + " of " + tables.length + " tables free." : ""}
         </p>
         <button className="btn-small" onClick={load}>
           REFRESH
