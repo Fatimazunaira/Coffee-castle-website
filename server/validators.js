@@ -134,6 +134,11 @@ const collectionValidators = {
       number: integer(1),
       seats: integer(1),
       order_id: nullableId,
+      shape: { enum: ["round", "square", "rect"] },
+      x: { bsonType: numericTypes },
+      y: { bsonType: numericTypes },
+      w: { bsonType: numericTypes, minimum: 1 },
+      h: { bsonType: numericTypes, minimum: 1 },
     },
   },
 };

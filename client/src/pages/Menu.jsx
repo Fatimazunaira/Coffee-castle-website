@@ -1,14 +1,16 @@
-import { useEffect, useState } from "react";
+import { useContext, useEffect, useState } from "react";
 import { Link } from "react-router-dom";
 import useMenu from "../data/useMenu";
 import { CATEGORIES } from "../data/menuOptions";
 import ItemPopup from "../components/ItemPopup";
+import { TableChoiceContext } from "../context/TableChoiceContext";
 import "../menu.css";
 
 // Customer menu page (/menu).
 // Hover a row: the food photo follows the cursor. Click a row: popup, then cart.
 function Menu() {
   const { items, loading, error } = useMenu();
+  const { chosen } = useContext(TableChoiceContext);
 
   const [selected, setSelected] = useState(null); // item shown in the popup
   const [active, setActive] = useState(null); // item whose photo is previewed
@@ -48,6 +50,17 @@ function Menu() {
         <h1>Menu</h1>
         <p>Point at a dish to see it. Click to order.</p>
       </div>
+
+      {chosen ? (
+        <p className="tc-banner">
+          Table {chosen.number} ({chosen.seats} seats) is chosen. It becomes yours when you place your
+          order. <Link to="/tables">Change table</Link>
+        </p>
+      ) : (
+        <p className="tc-banner plain">
+          Eating here? <Link to="/tables">Choose your table</Link> first. Takeaway needs no table.
+        </p>
+      )}
 
       {loading ? (
         <p className="mn-empty">Loading the menu…</p>

@@ -1,13 +1,15 @@
-import { useContext, useState } from "react";
+import { useContext, useEffect, useState } from "react";
 import { Link } from "react-router-dom";
 import { CartContext } from "../context/CartContext";
 import { AuthContext } from "../context/AuthContext";
+import { TableChoiceContext } from "../context/TableChoiceContext";
 import { api } from "../api";
 
 function Cart() {
   const { items, total, changeQty, removeItem, clearCart } =
     useContext(CartContext);
   const { user, loading } = useContext(AuthContext);
+  const { chosen, clear: clearTable } = useContext(TableChoiceContext);
 
   const [orderType, setOrderType] = useState("dine-in");
   const [payment, setPayment] = useState("counter");
@@ -19,6 +21,28 @@ function Cart() {
   const [placed, setPlaced] = useState(null); // the server's answer, once the order is saved
   const [error, setError] = useState("");
   const [busy, setBusy] = useState(false);
+  const needsTable = orderType === "dine-in" && !chosen;
+
+  // Dine-in: check the chosen table is still free (another guest may have ordered it meanwhile).
+  const chosenId = chosen ? chosen.id : null;
+  const chosenNumber = chosen ? chosen.number : null;
+  useEffect(() => {
+    if (!user || !chosenId) return;
+    let cancelled = false;
+    api("/api/tables")
+      .then((data) => {
+        if (cancelled) return;
+        const table = data.tables.find((t) => t.id === chosenId);
+        if (table && table.status === "booked" && !table.mine) {
+          clearTable();
+          setError(`Table ${chosenNumber} was just taken by another guest. Please choose another table.`);
+        }
+      })
+      .catch(() => {});
+    return () => {
+      cancelled = true;
+    };
+  }, [user, chosenId, chosenNumber, clearTable]);
 
   async function placeOrder(e) {
     e.preventDefault();
@@ -34,6 +58,7 @@ function Cart() {
           phone,
           orderType,
           payment,
+          tableId: orderType === "dine-in" && chosen ? chosen.id : undefined,
           items: items.map((item) => ({
             itemId: item.itemId,
             options: item.options || null,
@@ -43,7 +68,10 @@ function Cart() {
       });
       setPlaced(result);
       clearCart();
+      clearTable();
     } catch (err) {
+      // Someone else got the table first (or it is gone): forget it so the guest picks another.
+      if (err.code === "TABLE_TAKEN" || err.code === "NO_TABLE") clearTable();
       setError(err.message);
     }
     setBusy(false);
@@ -57,9 +85,6 @@ function Cart() {
           <h2>Thank you, {name}!</h2>
           <p>Your order #{placed.orderId} has been placed. Total: Rs. {placed.total}.</p>
           {placed.table && <p>Your table is number {placed.table.number}.</p>}
-          {placed.waiting && (
-            <p>All tables are taken right now. We will give you one as soon as it is free.</p>
-          )}
           <Link to="/" className="order-btn">
             BACK TO HOME
           </Link>
@@ -164,6 +189,20 @@ function Cart() {
             />{" "}
             Dine-in
           </label>
+          {orderType === "dine-in" && (
+            <p className="tc-pick">
+              {chosen ? (
+                <>
+                  Table {chosen.number} ({chosen.seats} seats). It is yours once you place the order.{" "}
+                  <Link to="/tables">Change</Link>
+                </>
+              ) : (
+                <>
+                  No table yet. <Link to="/tables">Choose a table</Link> to eat here.
+                </>
+              )}
+            </p>
+          )}
           <label className="choice">
             <input
               type="radio"
@@ -201,11 +240,11 @@ function Cart() {
 
           {error && (
             <p className="form-error" role="alert">
-              {error}
+              {error} {needsTable && <Link to="/tables">Choose a table</Link>}
             </p>
           )}
 
-          <button type="submit" className="place-btn" disabled={busy}>
+          <button type="submit" className="place-btn" disabled={busy || needsTable}>
             {busy ? "PLACING…" : "PLACE ORDER"}
           </button>
         </form>

@@ -1,6 +1,7 @@
 const { MongoClient } = require("mongodb");
 const bcrypt = require("bcryptjs");
 const { applyCollectionValidators } = require("./validators");
+const { TABLE_LAYOUT } = require("./tableLayout");
 
 if (!process.env.MONGODB_URI) {
   throw new Error("MONGODB_URI is missing. Set it in server/.env.");
@@ -51,8 +52,48 @@ async function connect() {
     ),
   ]);
 
+  // One guest can have only ONE active dine-in order (so only one table) at a time.
+  // MongoDB itself enforces this, so it holds even if the same person orders from two tabs
+  // or two phones at the same moment. "Active" = received and not yet completed by the admin.
+  try {
+    await database.collection("orders").createIndex(
+      { user_id: 1 },
+      {
+        unique: true,
+        name: "one_active_dine_in_per_user",
+        partialFilterExpression: { order_type: "dine-in", status: "received", table_id: { $type: "number" } },
+      }
+    );
+  } catch (err) {
+    console.warn(
+      "Could not create the 'one active dine-in order per guest' index. " +
+        "Some guest probably has two active dine-in orders already; complete one of them in the admin Tables tab and restart.",
+      err.message
+    );
+  }
+
   await seedDefaults();
   return database;
+}
+
+// Makes the cafe_tables collection match tableLayout.js (7 tables).
+// It only touches the layout fields, never order_id, so a table that is in use stays in use.
+async function syncTables() {
+  const tables = database.collection("cafe_tables");
+
+  for (const spec of TABLE_LAYOUT) {
+    const layout = { seats: spec.seats, shape: spec.shape, x: spec.x, y: spec.y, w: spec.w, h: spec.h };
+    const existing = await tables.findOne({ number: spec.number }, { projection: { _id: 1 } });
+    if (existing) {
+      await tables.updateOne({ _id: existing._id }, { $set: layout });
+    } else {
+      await tables.insertOne({ id: await nextId("cafe_tables"), number: spec.number, order_id: null, ...layout });
+    }
+  }
+
+  // Tables from the old 10-table setup that are not on the new plan. Only free ones are removed.
+  const numbers = TABLE_LAYOUT.map((spec) => spec.number);
+  await tables.deleteMany({ number: { $nin: numbers }, order_id: null });
 }
 
 async function seedDefaults() {
@@ -87,19 +128,7 @@ async function seedDefaults() {
     { upsert: true }
   );
 
-  const tables = database.collection("cafe_tables");
-  if ((await tables.countDocuments()) === 0) {
-    const starterTables = [];
-    for (let index = 0; index < 10; index++) {
-      starterTables.push({
-        id: await nextId("cafe_tables"),
-        number: index + 1,
-        seats: index < 4 ? 2 : 4,
-        order_id: null,
-      });
-    }
-    await tables.insertMany(starterTables);
-  }
+  await syncTables();
 
   if (!(await database.collection("users").findOne({ role: "admin" }))) {
     const email = (process.env.ADMIN_EMAIL || "admin@coffeecastle.pk").toLowerCase();

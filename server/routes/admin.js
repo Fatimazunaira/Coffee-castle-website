@@ -132,16 +132,8 @@ const listTables = async () => {
   });
 };
 
-const countWaiting = () =>
-  collection("orders").countDocuments({
-    order_type: "dine-in",
-    table_id: null,
-    status: { $ne: "completed" },
-  });
-
 router.get("/tables", async (req, res) => {
-  const [tables, waiting] = await Promise.all([listTables(), countWaiting()]);
-  res.json({ tables, waiting });
+  res.json({ tables: await listTables() });
 });
 
 async function freeTable(tableId) {
@@ -158,21 +150,8 @@ async function freeTable(tableId) {
   // Only frees the table if nobody changed it in the meantime.
   await tables.updateOne({ id: tableId, order_id: table.order_id }, { $set: { order_id: null } });
 
-  // Give the table to the oldest dine-in order that is still waiting.
-  // findOneAndUpdate is atomic, so two admins clicking together cannot grab the same order.
-  const next = await orders.findOneAndUpdate(
-    { order_type: "dine-in", table_id: null, status: { $ne: "completed" } },
-    { $set: { table_id: tableId } },
-    { sort: { id: 1 }, returnDocument: "after" }
-  );
-
-  if (next) {
-    const seated = await tables.updateOne({ id: tableId, order_id: null }, { $set: { order_id: next.id } });
-    if (seated.matchedCount === 0) {
-      // The table was taken by a new order first, so put this order back in the queue.
-      await orders.updateOne({ id: next.id }, { $set: { table_id: null } });
-    }
-  }
+  // A table from the old 10-table setup (it has no floor-plan position): once it is free, remove it.
+  if (!table.shape) await tables.deleteOne({ id: tableId, order_id: null, shape: { $exists: false } });
 
   return true;
 }
@@ -182,8 +161,7 @@ router.post("/tables/:id/free", async (req, res) => {
   if (!id || !(await freeTable(id))) {
     return res.status(404).json({ error: "Table not found." });
   }
-  const [tables, waiting] = await Promise.all([listTables(), countWaiting()]);
-  res.json({ tables, waiting });
+  res.json({ tables: await listTables() });
 });
 
 const IMAGE_PATH = /^\/[\w\-./]{1,200}$/;
